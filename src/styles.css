@@ -1,0 +1,226 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-glow: var(--primary-glow);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --font-display: "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+}
+
+:root {
+  /* `svh` isn't understood by browsers older than ~2022 (many in-app
+     WebViews included) — an unsupported value makes the whole height
+     declaration invalid, collapsing full-screen layout containers to
+     auto height and scrambling every absolutely/fixed-positioned child
+     stacked on top of them. Gate the modern unit behind @supports so
+     older browsers keep the 100vh fallback instead of losing height
+     entirely. */
+  --app-100vh: 100vh;
+
+  /* Height reserved for the bottom tab bar. On desktop the nav becomes a
+     left sidebar instead, so nothing is reserved at the bottom — keeping
+     this as a variable lets layout math stay in CSS classes rather than
+     inline styles, which can't be overridden per-breakpoint. */
+  --app-tabbar-h: 72px;
+}
+@supports (height: 100svh) {
+  :root {
+    --app-100vh: 100svh;
+  }
+}
+@media (min-width: 1024px) {
+  :root {
+    --app-tabbar-h: 0px;
+  }
+}
+
+:root {
+  --radius: 1rem;
+  --background: #fffaf6;
+  --foreground: #1f1611;
+  --card: #ffffff;
+  --card-foreground: #1f1611;
+  --popover: #ffffff;
+  --popover-foreground: #1f1611;
+  /* ChakulaFast spice orange — charcoal grills, pilau, chilli */
+  --primary: #c1440e;
+  --primary-foreground: #ffffff;
+  --primary-glow: #f2792a;
+  --secondary: #f0e2d8;
+  --secondary-foreground: #1f1611;
+  --muted: #f4ebe4;
+  --muted-foreground: #6b5545;
+  /* Deep green reads as "open / ready" against the warm base */
+  --accent: #0f7a55;
+  --accent-foreground: #ffffff;
+  --destructive: #ba1a1a;
+  --destructive-foreground: #ffffff;
+  --success: #12855a;
+  --success-foreground: #ffffff;
+  --warning: #c77700;
+  --warning-foreground: #3b2200;
+  --border: #e5d3c6;
+  --input: #e5d3c6;
+  --ring: #c1440e;
+
+  --gradient-primary: linear-gradient(135deg, #c1440e, #f2792a);
+  --gradient-hero: linear-gradient(160deg, #c1440e 0%, #8a2f08 100%);
+  --gradient-accent: linear-gradient(135deg, #f2792a, #c77700);
+  --shadow-elegant: 0 20px 50px -20px rgb(193 68 14 / 0.35);
+  --shadow-glow: 0 0 40px rgb(242 121 42 / 0.4);
+  --shadow-card: 0 4px 20px -4px rgb(31 22 17 / 0.1);
+
+  --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dark {
+  --background: #241a15;
+  --foreground: #f7ede6;
+  --card: #2e211a;
+  --card-foreground: #f7ede6;
+  --popover: #2e211a;
+  --popover-foreground: #f7ede6;
+  --primary: #ff9066;
+  --primary-foreground: #4a1400;
+  --primary-glow: #ffb08e;
+  --secondary: #3b2b22;
+  --secondary-foreground: #f0e2d8;
+  --muted: #38281f;
+  --muted-foreground: #c2ab9c;
+  --accent: #5fd3a3;
+  --accent-foreground: #00301f;
+  --destructive: #ffb4ab;
+  --destructive-foreground: #690005;
+  --success: #5fd3a3;
+  --success-foreground: #00301f;
+  --warning: #ffbe5c;
+  --warning-foreground: #3b2200;
+  --border: #4a3729;
+  --input: #4a3729;
+  --ring: #ff9066;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+}
+
+@layer utilities {
+  .bg-gradient-primary {
+    background: var(--gradient-primary);
+  }
+  .bg-gradient-hero {
+    background: var(--gradient-hero);
+  }
+  .bg-gradient-accent {
+    background: var(--gradient-accent);
+  }
+  .shadow-elegant {
+    box-shadow: var(--shadow-elegant);
+  }
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
+  }
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+  .transition-smooth {
+    transition: var(--transition-smooth);
+  }
+}
+
+/* Leaflet fixes */
+.leaflet-container {
+  font-family: var(--font-sans);
+}
+.leaflet-popup-content-wrapper {
+  border-radius: var(--radius);
+}
+
+/* The kitchen ticket flips into this state when the "start cooking now"
+   moment arrives, so it's visible across a busy counter from a metre away. */
+@keyframes cook-now-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(193 68 14 / 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgb(193 68 14 / 0);
+  }
+}
+.cook-now {
+  animation: cook-now-pulse 1.6s ease-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Still unmistakable without the movement — the ring just stays put. */
+  .cook-now {
+    animation: none;
+    box-shadow: 0 0 0 4px rgb(193 68 14 / 0.45);
+  }
+}
+
+/* Bottom sheet — pure card colour with elevation and a drag handle */
+.app-sheet {
+  background: var(--card);
+  border-top-left-radius: 1.5rem;
+  border-top-right-radius: 1.5rem;
+  box-shadow: 0px -4px 20px rgb(31 22 17 / 0.1);
+}
+.app-handle {
+  width: 48px;
+  height: 6px;
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--border) 70%, transparent);
+  margin: 10px auto 6px;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  scrollbar-width: none;
+}
