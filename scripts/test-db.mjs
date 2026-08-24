@@ -391,6 +391,147 @@ await db.exec(
 const closed = await one(`select public.is_restaurant_open('${rest.id}') o`);
 check(closed.o === false, "closed on every weekday reads as closed");
 
+// ---------------------------------------------------------------------------
+// Row Level Security.
+//
+// Everything above ran as the table owner, which bypasses RLS entirely — so
+// none of it says anything about what a real client can see. These checks
+// switch to the actual `anon` / `authenticated` roles, exactly as PostgREST
+// does, and assert on what comes back.
+//
+// Supabase grants table privileges to anon/authenticated automatically via
+// ALTER DEFAULT PRIVILEGES; that's replicated here so the policies are the
+// only thing standing between a role and the data.
+// ---------------------------------------------------------------------------
+console.log("\n=== row level security ===");
+await asService();
+await db.exec(`
+  grant usage on schema public to anon, authenticated;
+  grant select, insert, update, delete on all tables in schema public to anon, authenticated;
+  grant execute on all functions in schema public to anon, authenticated;
+`);
+
+// A second customer, to prove orders aren't visible across accounts.
+const other2 = await one(
+  `insert into auth.users (email, raw_user_meta_data)
+   values ('nosy@test', '{"full_name":"Nosy","role":"customer"}'::jsonb) returning id`,
+);
+
+/** Runs a query as a real Postgres role with a given end-user id. */
+async function as(role, uid, sql) {
+  await db.exec(`select set_config('request.jwt.claim.sub', '${uid ?? ""}', false);`);
+  await db.exec(`set role ${role};`);
+  try {
+    return await db.query(sql);
+  } finally {
+    await db.exec(`reset role;`);
+  }
+}
+async function denied(role, uid, sql) {
+  try {
+    await as(role, uid, sql);
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+// -- guests -----------------------------------------------------------------
+const anonRests = await as("anon", null, `select slug, status from public.restaurants`);
+check(
+  anonRests.rows.length === 1 && anonRests.rows[0].status === "active",
+  `guest sees only ACTIVE restaurants (${anonRests.rows.length} of 2)`,
+);
+const anonMenu = await as("anon", null, `select name from public.menu_items`);
+check(
+  anonMenu.rows.length === 2,
+  `guest sees the active restaurant's menu only (${anonMenu.rows.length} dishes)`,
+);
+const anonOrders = await as("anon", null, `select id from public.orders`);
+check(anonOrders.rows.length === 0, "guest sees no orders at all");
+const anonProfiles = await as("anon", null, `select id from public.profiles`);
+check(anonProfiles.rows.length === 0, "guest sees no profiles");
+check(
+  await denied(
+    "anon",
+    null,
+    `insert into public.orders (customer_id, restaurant_id, arrival_minutes)
+     values ('${customer.id}', '${rest.id}', 10)`,
+  ),
+  "guest cannot place an order",
+);
+
+// -- customers --------------------------------------------------------------
+const mine = await as("authenticated", customer.id, `select id from public.orders`);
+check(mine.rows.length === 2, `customer sees their own 2 orders (${mine.rows.length})`);
+const theirs = await as("authenticated", other2.id, `select id from public.orders`);
+check(theirs.rows.length === 0, "a different customer sees none of them");
+
+const otherProfile = await as(
+  "authenticated",
+  other2.id,
+  `select id from public.profiles where id = '${customer.id}'`,
+);
+check(otherProfile.rows.length === 0, "customer cannot read another customer's profile");
+
+check(
+  await denied(
+    "authenticated",
+    other2.id,
+    `insert into public.orders (customer_id, restaurant_id, arrival_minutes)
+     values ('${customer.id}', '${rest.id}', 10)`,
+  ),
+  "customer cannot place an order in someone else's name",
+);
+
+const custPayments = await as(
+  "authenticated",
+  customer.id,
+  `select id from public.registration_payments`,
+);
+check(custPayments.rows.length === 0, "customer cannot see registration payments");
+
+// -- vendors ----------------------------------------------------------------
+const vendorOrders = await as("authenticated", owner.id, `select id from public.orders`);
+check(
+  vendorOrders.rows.length === 2,
+  `vendor sees orders for their kitchen (${vendorOrders.rows.length})`,
+);
+const rivalOrders = await as("authenticated", sneaky.id, `select id from public.orders`);
+check(rivalOrders.rows.length === 0, "a rival restaurant sees none of them");
+
+const ownPay = await as("authenticated", owner.id, `select id from public.registration_payments`);
+check(ownPay.rows.length === 1, "vendor sees their own registration payment");
+const rivalPay = await as(
+  "authenticated",
+  sneaky.id,
+  `select id from public.registration_payments`,
+);
+check(rivalPay.rows.length === 0, "vendor cannot see another restaurant's payment");
+
+const rivalEdit = await as(
+  "authenticated",
+  sneaky.id,
+  `update public.menu_items set price = 1 where id = '${ugali.id}' returning id`,
+);
+const priceAfter = await one(`select price from public.menu_items where id = '${ugali.id}'`);
+check(
+  rivalEdit.rows.length === 0 && Number(priceAfter.price) === 8000,
+  `vendor cannot edit another restaurant's menu (${rivalEdit.rows.length} rows, price still ${priceAfter.price})`,
+);
+
+// The load-bearing one: a vendor must not be able to confirm its own payment.
+const selfConfirm = await as(
+  "authenticated",
+  owner.id,
+  `update public.registration_payments set status = 'confirmed'
+   where restaurant_id = '${rest.id}' returning id`,
+);
+check(
+  selfConfirm.rows.length === 0,
+  "vendor cannot confirm their own payment (0 rows affected by RLS)",
+);
+
 console.log(
   `\n${"=".repeat(52)}\n${failures === 0 ? "ALL CHECKS PASSED" : failures + " CHECK(S) FAILED"}\n${"=".repeat(52)}`,
 );
