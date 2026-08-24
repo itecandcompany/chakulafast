@@ -62,6 +62,17 @@ No CLI? Open the SQL editor in the dashboard and run each file in
 `supabase/migrations/` **in filename order**. They're numbered by timestamp and
 must be applied in sequence.
 
+Either way, you can check the schema before it touches your project:
+
+```bash
+npm run test:db
+```
+
+That boots a real Postgres in WebAssembly, applies every migration, then
+exercises the parts no type checker can see — that a customer can't rewrite a
+price, that a restaurant can't publish itself without paying, that the status
+pipeline only moves one step at a time. No Docker, no network, ~15 seconds.
+
 ### 3. Seed an admin and demo data
 
 ```bash
@@ -165,7 +176,7 @@ src/
 ├── integrations/supabase/      anon client · service-role client · middleware · types
 └── styles.css                  Tailwind v4 theme tokens
 supabase/migrations/            schema, RLS, triggers, RPCs
-scripts/                        seed-admin · seed-demo · gen:icons
+scripts/                        seed-admin · seed-demo · gen-icons · test-db
 ```
 
 ### Roles
@@ -274,16 +285,17 @@ in a Supabase Edge Function so the API key never reaches the browser.
 
 ## Scripts
 
-| Command              | Does                                                        |
-| -------------------- | ----------------------------------------------------------- |
-| `npm run dev`        | Vite dev server on :5173                                    |
-| `npm run build`      | production build (nitro `vercel` preset → `.vercel/output`) |
-| `npm run typecheck`  | `tsc --noEmit`                                              |
-| `npm run lint`       | ESLint                                                      |
-| `npm run format`     | Prettier                                                    |
-| `npm run seed:admin` | create/promote an admin account                             |
-| `npm run seed:demo`  | five Moshi restaurants, menus, hours, a customer            |
-| `npm run gen:icons`  | regenerate the PWA icon set and OG image                    |
+| Command              | Does                                                               |
+| -------------------- | ------------------------------------------------------------------ |
+| `npm run dev`        | Vite dev server on :5173                                           |
+| `npm run build`      | production build (nitro `vercel` preset → `.vercel/output`)        |
+| `npm run typecheck`  | `tsc --noEmit`                                                     |
+| `npm run test:db`    | runs the migrations against a real Postgres and tests the triggers |
+| `npm run lint`       | ESLint                                                             |
+| `npm run format`     | Prettier                                                           |
+| `npm run seed:admin` | create/promote an admin account                                    |
+| `npm run seed:demo`  | five Moshi restaurants, menus, hours, a customer                   |
+| `npm run gen:icons`  | regenerate the PWA icon set and OG image                           |
 
 ## Deployment
 

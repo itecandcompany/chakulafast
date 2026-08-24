@@ -55,9 +55,24 @@ CREATE POLICY "Users delete own uploads" ON storage.objects
 ALTER TABLE public.orders REPLICA IDENTITY FULL;
 ALTER TABLE public.order_events REPLICA IDENTITY FULL;
 ALTER TABLE public.order_pings REPLICA IDENTITY FULL;
-ALTER TABLE public.menu_items REPLICA IDENTITY FULL;
 ALTER TABLE public.restaurants REPLICA IDENTITY FULL;
 ALTER TABLE public.registration_payments REPLICA IDENTITY FULL;
+
+-- menu_items is deliberately NOT set to REPLICA IDENTITY FULL.
+--
+-- It carries a STORED GENERATED column (search_text), and from PostgreSQL 18
+-- a published table whose replica identity includes an unpublished generated
+-- column rejects every UPDATE:
+--
+--   ERROR 42P10: cannot update table "menu_items"
+--   DETAIL: Replica identity must not contain unpublished generated columns.
+--
+-- That would break every menu edit — including the out-of-stock toggle the
+-- vendor screen leans on during service. The default replica identity (the
+-- primary key) is all this table needs anyway: subscribers here only use the
+-- event to refetch, and INSERT/UPDATE payloads carry the full new row
+-- regardless of replica identity. Only the *old* row is trimmed, and nothing
+-- subscribes to menu_items deletions.
 
 DO $$
 DECLARE
