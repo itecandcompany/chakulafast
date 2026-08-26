@@ -38,11 +38,16 @@ const searchSchema = z.object({
   max: z.coerce.number().positive().optional().catch(undefined),
   // Not z.coerce.boolean() — that turns the string "false" into `true`,
   // because every non-empty string is truthy.
+  //
+  // `.optional()` has to come *after* `.transform()`: from zod 4 a transform
+  // applied to an optional produces a required key typed `boolean | undefined`,
+  // which makes every `<Link search={...}>` in the app demand an explicit
+  // `open`. Wrapping the transform keeps the key genuinely optional.
   open: z
     .union([z.boolean(), z.string()])
+    .transform((v) => (typeof v === "string" ? v === "true" : v))
     .optional()
-    .catch(undefined)
-    .transform((v) => (typeof v === "string" ? v === "true" : v)),
+    .catch(undefined),
 });
 
 export const Route = createFileRoute("/search")({

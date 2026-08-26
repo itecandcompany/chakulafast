@@ -27,8 +27,15 @@ export function useArrivalSharing(
   const lastPingAt = useRef(0);
   // Held in a ref rather than state so the watch callback never needs to be
   // re-registered, which would restart the GPS subscription.
+  //
+  // Written in an effect, not during render: React can render a component
+  // without committing it (StrictMode, a discarded concurrent render), and a
+  // ref mutated during that render keeps a value the committed tree never
+  // agreed to. Here that would mean pinging the wrong restaurant.
   const destinationRef = useRef(destination);
-  destinationRef.current = destination;
+  useEffect(() => {
+    destinationRef.current = destination;
+  }, [destination.lat, destination.lng]);
 
   useEffect(() => {
     if (!enabled) {
