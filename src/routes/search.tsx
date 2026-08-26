@@ -17,6 +17,7 @@ import {
   DEFAULT_FILTERS,
   isSortOption,
   searchDishes,
+  suggestDish,
   fetchActiveTowns,
   type DishResult,
   type SearchFilters,
@@ -67,6 +68,7 @@ function SearchPage() {
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<"list" | "map">("list");
   const [towns, setTowns] = useState<string[]>([]);
+  const [correctedTo, setCorrectedTo] = useState<string | null>(null);
 
   // The URL is the single source of truth for the filter state; this just
   // reshapes it into the object the query and the filter bar both speak.
@@ -120,9 +122,27 @@ function SearchPage() {
     setResults(null);
     setError(null);
 
+    setCorrectedTo(null);
+
     searchDishes(filters, searchOrigin)
-      .then((rows) => {
-        if (!cancelled) setResults(rows);
+      .then(async (rows) => {
+        if (cancelled) return;
+        setResults(rows);
+
+        // Offer a correction only when every hit was approximate — if
+        // anything matched exactly, the spelling was fine and the fuzzy
+        // extras are a bonus rather than a substitution.
+        const allFuzzy = rows.length > 0 && rows.every((r) => r.is_fuzzy_match);
+        if (!allFuzzy || !filters.q.trim()) return;
+
+        const suggestion = await suggestDish(filters.q);
+        if (
+          !cancelled &&
+          suggestion &&
+          suggestion.toLowerCase() !== filters.q.trim().toLowerCase()
+        ) {
+          setCorrectedTo(suggestion);
+        }
       })
       .catch((err) => {
         if (cancelled) return;
@@ -217,6 +237,21 @@ function SearchPage() {
               <p className="text-xs text-muted-foreground">
                 {t("search.count", { count: results.length })}
                 {!locationCtx.position && ` · ${locationCtx.town}`}
+              </p>
+            )}
+            {/* Only shown when *nothing* matched exactly. If some results are
+                real matches, correcting the spelling would be wrong — the
+                fuzzy extras are a bonus, not a substitution. */}
+            {correctedTo && (
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {t("search.didYouMean")}{" "}
+                <button
+                  type="button"
+                  onClick={() => applyFilters({ ...filters, q: correctedTo })}
+                  className="font-semibold text-primary hover:underline"
+                >
+                  {correctedTo}
+                </button>
               </p>
             )}
           </div>

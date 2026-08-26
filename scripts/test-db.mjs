@@ -12,6 +12,7 @@
 // same GUC Supabase uses, so the guard triggers behave exactly as they will in
 // production when we impersonate a user.
 import { PGlite } from "@electric-sql/pglite";
+import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -60,7 +61,10 @@ language sql immutable as $fn$ select string_to_array(name, '/') $fn$;
 create publication supabase_realtime;
 `;
 
-const db = await PGlite.create();
+// pg_trgm is loaded so the trigram index and the `<%` word-similarity
+// operator behind typo-tolerant search are genuinely exercised, rather than
+// silently skipped by the migration's fallback path.
+const db = await PGlite.create({ extensions: { pg_trgm } });
 
 const say = (ok, msg) => console.log(`${ok ? "  PASS" : "  FAIL"}  ${msg}`);
 let failures = 0;
@@ -358,6 +362,63 @@ check(
   Number(nearby.rows[0]?.min_price) === 1500,
   `min_price = cheapest dish (${nearby.rows[0]?.min_price})`,
 );
+
+console.log("\n=== typo-tolerant search ===");
+const typo = await db.query(`select item_name, is_fuzzy_match from public.search_dishes('ugaly')`);
+check(
+  typo.rows.length === 1 && typo.rows[0].item_name === "Ugali na nyama choma",
+  `"ugaly" still finds the ugali (${typo.rows.length} row)`,
+);
+check(typo.rows[0]?.is_fuzzy_match === true, "the near-miss is flagged as a fuzzy match");
+
+const exact = await db.query(`select is_fuzzy_match from public.search_dishes('ugali')`);
+check(exact.rows[0]?.is_fuzzy_match === false, "an exact match is not flagged as fuzzy");
+
+// Fuzzy must never outrank exact, or a typo's approximate hits bury the real
+// ones and the feature reads as broken.
+// "Sodda" is deliberately NOT a superstring of "soda" — otherwise it would
+// match the LIKE branch and this would prove nothing about ranking. It is
+// also priced below the exact match, so price_asc would put it first if
+// fuzziness were not the primary sort key.
+await asService();
+const nearMiss = await one(
+  `insert into public.menu_items (restaurant_id, name, price, category, prep_minutes)
+   values ('${rest.id}', 'Sodda ya kienyeji', 500, 'drinks', 2) returning id`,
+);
+const ranked = await db.query(
+  `select item_name, price, is_fuzzy_match
+   from public.search_dishes('soda', null, null, null, null, null, null, false, true, 'price_asc', 60)`,
+);
+check(
+  ranked.rows.length === 2,
+  `fuzzy search finds both the exact and the near-miss (${ranked.rows.length})`,
+);
+check(
+  ranked.rows[0]?.is_fuzzy_match === false && ranked.rows[1]?.is_fuzzy_match === true,
+  `exact outranks fuzzy even though the fuzzy one is cheaper (${ranked.rows
+    .map((r) => `${r.item_name} ${r.price}`)
+    .join(" -> ")})`,
+);
+await db.exec(`delete from public.menu_items where id = '${nearMiss.id}'`);
+
+// Short queries must still substring-match ("ug" -> ugali is genuinely
+// useful); what they must not do is fuzzy-match, which at two characters
+// pulls in nearly the whole menu.
+const shortExact = await db.query(`select is_fuzzy_match from public.search_dishes('ug')`);
+check(
+  shortExact.rows.length > 0 && shortExact.rows.every((r) => r.is_fuzzy_match === false),
+  `a 2-character query substring-matches but never fuzzy-matches (${shortExact.rows.length} rows, all exact)`,
+);
+const shortJunk = await db.query(`select item_name from public.search_dishes('zq')`);
+check(
+  shortJunk.rows.length === 0,
+  `a 2-character non-match returns nothing rather than fuzzing (${shortJunk.rows.length} rows)`,
+);
+
+const suggestion = await one(`select public.suggest_dish('ugaly') s`);
+check(suggestion.s === "Ugali na nyama choma", `suggest_dish('ugaly') -> '${suggestion.s}'`);
+const noSuggestion = await one(`select public.suggest_dish('zzzzzz') s`);
+check(noSuggestion.s === null, "no suggestion for something nobody sells");
 
 console.log("\n=== reviews rollup ===");
 await asService();

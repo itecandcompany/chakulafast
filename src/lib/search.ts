@@ -85,6 +85,24 @@ export async function fetchNearbyRestaurants(
 }
 
 /**
+ * The closest real dish name to what was typed, for the "showing results for
+ * ugali" line above a set of fuzzy hits.
+ *
+ * Returns null rather than throwing: a missing suggestion should quietly drop
+ * the correction line, never take the results page down with it.
+ */
+export async function suggestDish(query: string): Promise<string | null> {
+  const q = query.trim();
+  if (q.length < 3) return null;
+  const { data, error } = await supabase.rpc("suggest_dish", { _q: q });
+  if (error) {
+    console.error(error);
+    return null;
+  }
+  return data ?? null;
+}
+
+/**
  * Towns that actually have a listing. Falls back to an empty array rather
  * than throwing — the area picker always has the static TOWNS list to fall
  * back on, so a failure here should degrade, not break the page.

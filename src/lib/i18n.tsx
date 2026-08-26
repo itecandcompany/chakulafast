@@ -91,6 +91,7 @@ const en = {
   "search.widen": "Widen search to {km} km",
   "search.clearFilters": "Clear filters",
   "search.placeholder": "Search a dish…",
+  "search.didYouMean": "Did you mean",
 
   "filter.sort": "Sort",
   "filter.sortDistance": "Nearest first",
@@ -313,6 +314,7 @@ const sw: Record<TKey, string> = {
   "search.widen": "Panua utafutaji hadi km {km}",
   "search.clearFilters": "Ondoa vichujio",
   "search.placeholder": "Tafuta chakula…",
+  "search.didYouMean": "Ulimaanisha",
 
   "filter.sort": "Panga",
   "filter.sortDistance": "Karibu zaidi kwanza",

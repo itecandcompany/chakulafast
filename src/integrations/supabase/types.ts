@@ -617,7 +617,12 @@ export type Database = {
           is_accepting_orders: boolean;
           is_open: boolean;
           distance_km: number | null;
+          is_fuzzy_match: boolean;
         }[];
+      };
+      suggest_dish: {
+        Args: { _q: string };
+        Returns: string | null;
       };
     };
     Enums: {
