@@ -144,7 +144,7 @@ function AuthPage() {
 
   return (
     <div className="min-h-[var(--app-100vh)] bg-background">
-      <div className="mx-auto flex min-h-[var(--app-100vh)] max-w-md flex-col px-4 py-6">
+      <div className="mx-auto flex min-h-[var(--app-100vh)] max-w-md flex-col px-4 pb-6 pt-[max(1.5rem,env(safe-area-inset-top))]">
         <Link
           to="/"
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
