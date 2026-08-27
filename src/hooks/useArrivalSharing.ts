@@ -35,6 +35,10 @@ export function useArrivalSharing(
   const destinationRef = useRef(destination);
   useEffect(() => {
     destinationRef.current = destination;
+    // Keyed on the coordinates, not the object: callers rebuild `destination`
+    // every render, and depending on its identity would rewrite the ref on
+    // every render for no reason.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [destination.lat, destination.lng]);
 
   useEffect(() => {
@@ -85,9 +89,8 @@ export function useArrivalSharing(
       cancelled = true;
       navigator.geolocation.clearWatch(watchId);
     };
-    // `destination` is deliberately absent: it is read through a ref so the
-    // GPS watch is never torn down and re-registered mid-journey.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // `destination` is absent on purpose: it is read through destinationRef,
+    // so the GPS watch is never torn down and re-registered mid-journey.
   }, [enabled, orderId]);
 
   return { etaMinutes, error };

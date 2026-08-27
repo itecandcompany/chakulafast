@@ -31,8 +31,29 @@ const SAFE_DB_MESSAGE_PREFIXES = [
   "That order no longer exists",
 ];
 
+/**
+ * PostgREST errors carry the useful part in `code`, `details` and `hint`
+ * rather than in `message` — a bare `console.error` of the object prints
+ * `[object Object]` in some consoles and buries the rest. Logging the fields
+ * explicitly is the difference between "Couldn't create your listing" being
+ * diagnosable in one glance or in an hour.
+ */
+function describe(error: unknown): string {
+  if (error && typeof error === "object") {
+    const e = error as { code?: string; details?: string; hint?: string; message?: string };
+    const parts = [
+      e.code && `code=${e.code}`,
+      e.message && `message=${e.message}`,
+      e.details && `details=${e.details}`,
+      e.hint && `hint=${e.hint}`,
+    ].filter(Boolean);
+    if (parts.length) return parts.join(" | ");
+  }
+  return String(error);
+}
+
 export function toUserMessage(error: unknown, fallback: string = DEFAULT_FALLBACK): string {
-  if (error) console.error(error);
+  if (error) console.error("[chakulafast]", describe(error), error);
 
   const raw = error instanceof Error ? error.message : typeof error === "string" ? error : "";
   if (!raw) return fallback;
@@ -58,6 +79,16 @@ export function toUserMessage(error: unknown, fallback: string = DEFAULT_FALLBAC
   }
   if (m.includes("violates") || m.includes("constraint") || m.includes("invalid input syntax")) {
     return "That couldn't be saved — please check your input and try again.";
+  }
+
+  // In development, append the Postgres error code to the generic fallback.
+  // Without it every unmatched database failure looks identical on screen —
+  // a missing column, a stale schema cache and a zero-row .single() all read
+  // as the same sentence, which is how a five-minute fix turns into an hour.
+  // Never in production: an error code is internal detail.
+  if (import.meta.env.DEV) {
+    const code = (error as { code?: string } | null)?.code;
+    if (code) return `${fallback} (${code})`;
   }
 
   return fallback;
