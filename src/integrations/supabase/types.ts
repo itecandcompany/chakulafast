@@ -620,6 +620,32 @@ export type Database = {
           is_fuzzy_match: boolean;
         }[];
       };
+      vendor_summary: {
+        Args: { _restaurant_id: string; _days?: number };
+        Returns: {
+          orders_total: number;
+          orders_completed: number;
+          orders_cancelled: number;
+          takings: number;
+          average_order: number;
+          ready_on_time_pct: number | null;
+          median_prep_minutes: number | null;
+          rating: number;
+          rating_count: number;
+        }[];
+      };
+      vendor_daily: {
+        Args: { _restaurant_id: string; _days?: number };
+        Returns: { day: string; orders: number; takings: number }[];
+      };
+      vendor_top_dishes: {
+        Args: { _restaurant_id: string; _days?: number; _limit?: number };
+        Returns: { name: string; qty: number; takings: number }[];
+      };
+      vendor_busiest_hours: {
+        Args: { _restaurant_id: string; _days?: number };
+        Returns: { hour: number; orders: number }[];
+      };
       suggest_dish: {
         Args: { _q: string };
         Returns: string | null;

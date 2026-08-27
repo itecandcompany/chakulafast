@@ -7,6 +7,8 @@ import { AuthProvider } from "@/lib/auth";
 import { registerServiceWorker } from "@/lib/pwa";
 import { I18nProvider } from "@/lib/i18n";
 import InstallBanner from "@/components/InstallBanner";
+import SetupRequired from "@/components/SetupRequired";
+import { isSupabaseConfigured } from "@/integrations/supabase/client";
 
 const TITLE = "ChakulaFast — Order food ahead, ready when you arrive";
 const DESCRIPTION =
@@ -139,6 +141,14 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   useEffect(() => registerServiceWorker(), []);
+
+  // Checked before AuthProvider mounts, because that is the first thing to
+  // touch the Supabase client — and without credentials it throws during
+  // render, which the error boundary then reports as a crash rather than as
+  // an unfinished setup.
+  if (!isSupabaseConfigured()) {
+    return <SetupRequired />;
+  }
 
   return (
     <I18nProvider>

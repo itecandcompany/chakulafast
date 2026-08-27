@@ -26,6 +26,7 @@ import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as RSlugRouteImport } from './routes/r.$slug'
 import { Route as VendorIndexRouteImport } from './routes/vendor.index'
 import { Route as VendorBillingRouteImport } from './routes/vendor.billing'
+import { Route as VendorInsightsRouteImport } from './routes/vendor.insights'
 import { Route as VendorMenuRouteImport } from './routes/vendor.menu'
 import { Route as VendorProfileRouteImport } from './routes/vendor.profile'
 import { Route as VendorSetupRouteImport } from './routes/vendor.setup'
@@ -115,6 +116,11 @@ const VendorBillingRoute = VendorBillingRouteImport.update({
   path: '/billing',
   getParentRoute: () => VendorRoute,
 } as any)
+const VendorInsightsRoute = VendorInsightsRouteImport.update({
+  id: '/insights',
+  path: '/insights',
+  getParentRoute: () => VendorRoute,
+} as any)
 const VendorMenuRoute = VendorMenuRouteImport.update({
   id: '/menu',
   path: '/menu',
@@ -147,6 +153,7 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof AdminUsersRoute
   '/r/$slug': typeof RSlugRoute
   '/vendor/billing': typeof VendorBillingRoute
+  '/vendor/insights': typeof VendorInsightsRoute
   '/vendor/menu': typeof VendorMenuRoute
   '/vendor/profile': typeof VendorProfileRoute
   '/vendor/setup': typeof VendorSetupRoute
@@ -167,6 +174,7 @@ export interface FileRoutesByTo {
   '/admin/users': typeof AdminUsersRoute
   '/r/$slug': typeof RSlugRoute
   '/vendor/billing': typeof VendorBillingRoute
+  '/vendor/insights': typeof VendorInsightsRoute
   '/vendor/menu': typeof VendorMenuRoute
   '/vendor/profile': typeof VendorProfileRoute
   '/vendor/setup': typeof VendorSetupRoute
@@ -190,6 +198,7 @@ export interface FileRoutesById {
   '/admin/users': typeof AdminUsersRoute
   '/r/$slug': typeof RSlugRoute
   '/vendor/billing': typeof VendorBillingRoute
+  '/vendor/insights': typeof VendorInsightsRoute
   '/vendor/menu': typeof VendorMenuRoute
   '/vendor/profile': typeof VendorProfileRoute
   '/vendor/setup': typeof VendorSetupRoute
@@ -214,6 +223,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/r/$slug'
     | '/vendor/billing'
+    | '/vendor/insights'
     | '/vendor/menu'
     | '/vendor/profile'
     | '/vendor/setup'
@@ -234,6 +244,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/r/$slug'
     | '/vendor/billing'
+    | '/vendor/insights'
     | '/vendor/menu'
     | '/vendor/profile'
     | '/vendor/setup'
@@ -256,6 +267,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/r/$slug'
     | '/vendor/billing'
+    | '/vendor/insights'
     | '/vendor/menu'
     | '/vendor/profile'
     | '/vendor/setup'
@@ -397,6 +409,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VendorBillingRouteImport
       parentRoute: typeof VendorRoute
     }
+    '/vendor/insights': {
+      id: '/vendor/insights'
+      path: '/insights'
+      fullPath: '/vendor/insights'
+      preLoaderRoute: typeof VendorInsightsRouteImport
+      parentRoute: typeof VendorRoute
+    }
     '/vendor/menu': {
       id: '/vendor/menu'
       path: '/menu'
@@ -441,6 +460,7 @@ const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 interface VendorRouteChildren {
   VendorBillingRoute: typeof VendorBillingRoute
+  VendorInsightsRoute: typeof VendorInsightsRoute
   VendorMenuRoute: typeof VendorMenuRoute
   VendorProfileRoute: typeof VendorProfileRoute
   VendorSetupRoute: typeof VendorSetupRoute
@@ -449,6 +469,7 @@ interface VendorRouteChildren {
 
 const VendorRouteChildren: VendorRouteChildren = {
   VendorBillingRoute: VendorBillingRoute,
+  VendorInsightsRoute: VendorInsightsRoute,
   VendorMenuRoute: VendorMenuRoute,
   VendorProfileRoute: VendorProfileRoute,
   VendorSetupRoute: VendorSetupRoute,

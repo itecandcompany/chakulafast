@@ -21,8 +21,8 @@ export const Route = createFileRoute("/orders")({
 const SELECT = `
   id, code, status, total, prep_minutes, expected_arrival_at, created_at,
   cancel_reason, note,
-  restaurants ( id, name, slug, lat, lng, address ),
-  order_items ( id, name, qty, line_total ),
+  restaurants ( id, name, slug, lat, lng, address, town ),
+  order_items ( id, name, qty, line_total, menu_item_id ),
   reviews ( id )
 `;
 

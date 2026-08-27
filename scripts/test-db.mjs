@@ -288,6 +288,20 @@ const events = await one(
 );
 check(events.c === 3, `status history logged: pending, accepted, preparing (got ${events.c})`);
 
+// Timestamps must be stamped for every writer, not only the vendor path.
+// They used to be set after the guard's authorisation short-circuits, so an
+// admin or a server function moving an order left them null and quietly
+// broke the vendor's ready-on-time metric.
+await asService();
+const svcOrder = await one(`
+  insert into public.orders (customer_id, restaurant_id, arrival_minutes)
+  values ('${customer.id}', '${rest.id}', 20) returning id`);
+await db.exec(`update public.orders set status='accepted' where id='${svcOrder.id}'`);
+const svcStamped = await one(`select accepted_at from public.orders where id='${svcOrder.id}'`);
+check(svcStamped.accepted_at !== null, "service-role status change still stamps accepted_at");
+await db.exec(`delete from public.orders where id='${svcOrder.id}'`);
+await asUser(customer.id);
+
 console.log("\n=== ready-on-arrival maths ===");
 const timing = await one(`
   select (extract(epoch from (expected_arrival_at - now()))/60)::float8 as mins_to_arrival,
@@ -464,6 +478,88 @@ check(closed.o === false, "closed on every weekday reads as closed");
 // ALTER DEFAULT PRIVILEGES; that's replicated here so the policies are the
 // only thing standing between a role and the data.
 // ---------------------------------------------------------------------------
+console.log("\n=== vendor analytics ===");
+await asUser(owner.id);
+const summary = await one(`select * from public.vendor_summary('${rest.id}', 30)`);
+check(Number(summary.orders_total) === 2, `counts this kitchen's orders (${summary.orders_total})`);
+check(
+  Number(summary.orders_completed) === 1,
+  `counts completed separately (${summary.orders_completed})`,
+);
+check(Number(summary.takings) === 17500, `takings sum only completed orders (${summary.takings})`);
+check(
+  Number(summary.rating) === 4 && summary.rating_count === 1,
+  `carries the rating through (${summary.rating}, n=${summary.rating_count})`,
+);
+// The metric asks "was the food ready before the customer said they'd
+// arrive". The completed order was marked ready seconds after it was placed,
+// 15 minutes ahead of its arrival time, so 100% is the honest answer.
+//
+// Compared against null explicitly rather than through Number(): `Number(null)
+// === 0` is true, so a missing ready_at would otherwise sail through as a
+// genuine score.
+check(
+  summary.ready_on_time_pct !== null && Number(summary.ready_on_time_pct) === 100,
+  `ready-on-time measured, not null (${summary.ready_on_time_pct}%)`,
+);
+
+const daily = await db.query(
+  `select day, orders, takings from public.vendor_daily('${rest.id}', 14)`,
+);
+check(daily.rows.length === 14, `daily series returns one row per day (${daily.rows.length})`);
+check(
+  daily.rows.filter((r) => Number(r.orders) > 0).length === 1,
+  "quiet days are present as zeroes rather than missing",
+);
+check(
+  Number(daily.rows[daily.rows.length - 1].takings) === 17500,
+  `today's takings land on today (${daily.rows[daily.rows.length - 1].takings})`,
+);
+
+const top = await db.query(
+  `select name, qty, takings from public.vendor_top_dishes('${rest.id}', 30, 10)`,
+);
+check(
+  top.rows.length === 2 && top.rows[0].name === "Ugali na nyama choma",
+  `best seller first by quantity (${top.rows.map((r) => `${r.name} x${r.qty}`).join(", ")})`,
+);
+
+const hours = await db.query(
+  `select hour, orders from public.vendor_busiest_hours('${rest.id}', 30)`,
+);
+check(hours.rows.length === 24, `busiest-hours covers the full day (${hours.rows.length} buckets)`);
+
+// The gate: analytics are SECURITY DEFINER and bypass RLS, so ownership has
+// to be enforced inside the function or any signed-in user could read a
+// rival's takings.
+let peeked = false;
+try {
+  await as("authenticated", sneaky.id, `select * from public.vendor_summary('${rest.id}', 30)`);
+} catch (e) {
+  peeked = /Not authorized to view this restaurant/.test(e.message);
+}
+check(peeked, "a rival restaurant cannot read another kitchen's analytics");
+
+// A metric that only ever reports 100% measures nothing. Prove it moves: an
+// order whose customer arrives *now* cannot be ready before they get there.
+await asService();
+const lateOrder = await one(`
+  insert into public.orders (customer_id, restaurant_id, arrival_minutes)
+  values ('${customer.id}', '${rest.id}', 0) returning id`);
+await db.exec(`update public.orders set status='accepted'  where id='${lateOrder.id}'`);
+await db.exec(`update public.orders set status='preparing' where id='${lateOrder.id}'`);
+await db.exec(`update public.orders set status='ready'     where id='${lateOrder.id}'`);
+await asUser(owner.id);
+const afterLate = await one(
+  `select ready_on_time_pct from public.vendor_summary('${rest.id}', 30)`,
+);
+check(
+  Number(afterLate.ready_on_time_pct) === 50,
+  `one on-time and one late reads 50%, so the metric discriminates (${afterLate.ready_on_time_pct}%)`,
+);
+await asService();
+await db.exec(`delete from public.orders where id='${lateOrder.id}'`);
+
 console.log("\n=== row level security ===");
 await asService();
 await db.exec(`

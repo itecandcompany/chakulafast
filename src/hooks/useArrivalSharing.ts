@@ -85,6 +85,9 @@ export function useArrivalSharing(
       cancelled = true;
       navigator.geolocation.clearWatch(watchId);
     };
+    // `destination` is deliberately absent: it is read through a ref so the
+    // GPS watch is never torn down and re-registered mid-journey.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, orderId]);
 
   return { etaMinutes, error };

@@ -24,6 +24,30 @@ function createSupabaseClient() {
   });
 }
 
+/**
+ * Whether the app has real Supabase credentials to talk to.
+ *
+ * Checked before anything touches the client, because the alternative is a
+ * throw during render that surfaces as the generic red error boundary with a
+ * raw technical message — which looks like the app is broken rather than
+ * simply not set up yet. The root route uses this to show setup instructions
+ * instead.
+ *
+ * Placeholder values count as unconfigured: `.env.example` ships with
+ * `your-project.supabase.co`, and copying it without editing is the single
+ * most likely way to get here. Failing loudly at that point is far better
+ * than every query dying with an opaque DNS error.
+ */
+export function isSupabaseConfigured(): boolean {
+  const url = import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+  const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY;
+
+  if (!url || !key) return false;
+  if (url.includes("your-project") || key.startsWith("your-")) return false;
+  if (url.includes("placeholder") || key.includes("placeholder")) return false;
+  return true;
+}
+
 let _supabase: ReturnType<typeof createSupabaseClient> | undefined;
 
 // Import the supabase client like this:

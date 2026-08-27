@@ -183,6 +183,8 @@ const en = {
   "order.eta": "You're about {count} min away",
   "order.rate": "Rate this order",
   "order.reorder": "Order again",
+  "order.reorderGone": "Nothing from that order is on the menu right now.",
+  "order.reorderPartial": "{count} item(s) were unavailable and left out.",
   "order.items": "{count} items",
 
   "status.pending": "Sent to kitchen",
@@ -406,6 +408,8 @@ const sw: Record<TKey, string> = {
   "order.eta": "Umebaki takriban dakika {count}",
   "order.rate": "Toa maoni kuhusu oda hii",
   "order.reorder": "Agiza tena",
+  "order.reorderGone": "Hakuna chochote cha oda hiyo kinachopatikana sasa.",
+  "order.reorderPartial": "Vitu {count} havikupatikana na vimeachwa.",
   "order.items": "Vitu {count}",
 
   "status.pending": "Imetumwa jikoni",
