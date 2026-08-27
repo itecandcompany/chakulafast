@@ -4,9 +4,13 @@
     {
       "name": "chakulafast-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
-      "comment": "8080, not Vite's usual 5173: @lovable.dev/vite-tanstack-config sets the port itself.",
-      "port": 8080
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "comment": "Vite's port comes from @lovable.dev/vite-tanstack-config, not the usual 5173. autoPort lets a second instance start when 8080 is already taken.",
+      "port": 8080,
+      "autoPort": true
     }
   ]
 }
