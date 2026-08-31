@@ -620,6 +620,21 @@ export type Database = {
           is_fuzzy_match: boolean;
         }[];
       };
+      admin_summary: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          total_users: number;
+          total_restaurants: number;
+          active_restaurants: number;
+          awaiting_payment: number;
+          payments_to_verify: number;
+          total_orders: number;
+          live_orders: number;
+          completed_orders: number;
+          fee_revenue: number;
+          order_volume: number;
+        }[];
+      };
       vendor_summary: {
         Args: { _restaurant_id: string; _days?: number };
         Returns: {

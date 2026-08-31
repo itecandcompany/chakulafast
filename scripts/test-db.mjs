@@ -560,6 +560,52 @@ check(
 await asService();
 await db.exec(`delete from public.orders where id='${lateOrder.id}'`);
 
+console.log("\n=== admin summary ===");
+// Promote the sneaky user to admin so there is someone allowed to read this.
+await asService();
+await db.exec(`delete from public.user_roles where user_id = '${sneaky.id}'`);
+await db.exec(`insert into public.user_roles (user_id, role) values ('${sneaky.id}', 'admin')`);
+
+await asUser(sneaky.id);
+const platform = await one(`select * from public.admin_summary()`);
+check(
+  Number(platform.total_restaurants) === 2,
+  `counts every restaurant (${platform.total_restaurants})`,
+);
+check(
+  Number(platform.active_restaurants) === 1,
+  `counts only the paid-up one as active (${platform.active_restaurants})`,
+);
+check(
+  Number(platform.fee_revenue) === 5000,
+  `fee revenue is the confirmed registration fee (${platform.fee_revenue})`,
+);
+check(
+  Number(platform.order_volume) === 17500,
+  `order volume is food sold, kept separate from fee revenue (${platform.order_volume})`,
+);
+check(
+  Number(platform.fee_revenue) !== Number(platform.order_volume),
+  "platform revenue and order volume are not the same number",
+);
+
+// The gate. SECURITY DEFINER bypasses RLS, so without this check any signed-in
+// customer could read the platform's revenue.
+let peekedPlatform = false;
+try {
+  await as("authenticated", customer.id, `select * from public.admin_summary()`);
+} catch (e) {
+  peekedPlatform = /Not authorized to view platform statistics/.test(e.message);
+}
+check(peekedPlatform, "a customer cannot read platform statistics");
+
+// Put the role back so the RLS section below still sees a non-admin rival.
+await asService();
+await db.exec(`delete from public.user_roles where user_id = '${sneaky.id}'`);
+await db.exec(
+  `insert into public.user_roles (user_id, role) values ('${sneaky.id}', 'restaurant')`,
+);
+
 console.log("\n=== row level security ===");
 await asService();
 await db.exec(`

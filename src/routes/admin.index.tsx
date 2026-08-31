@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
   ChefHat,
@@ -16,107 +16,40 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { toUserMessage } from "@/lib/errorMessages";
 import { formatTsh } from "@/lib/geo";
-import { LIVE_STATUSES } from "@/lib/orderStatus";
+import { qk } from "@/lib/queryClient";
 
 export const Route = createFileRoute("/admin/")({ component: AdminOverview });
 
-type Kpis = {
-  totalUsers: number;
-  totalRestaurants: number;
-  activeRestaurants: number;
-  awaitingPayment: number;
-  paymentsToVerify: number;
-  totalOrders: number;
-  liveOrders: number;
-  completedOrders: number;
-  feeRevenue: number;
-  orderVolume: number;
-};
-
 function AdminOverview() {
-  const [kpis, setKpis] = useState<Kpis | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // One request instead of ten, and the two revenue figures are summed in
+  // Postgres. The previous version pulled every registration_payments.amount
+  // and every orders.total into the browser to add them up — unbounded by
+  // construction, and slower with every order the platform ever takes.
+  const {
+    data: kpis,
+    error: queryError,
+    refetch,
+  } = useQuery({
+    queryKey: qk.adminSummary(),
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("admin_summary");
+      if (error) throw error;
+      return (data ?? [])[0] ?? null;
+    },
+    // The console is a monitoring surface, so it stays current on its own —
+    // but 60s rather than the old 30s, now that it is one cheap call.
+    refetchInterval: 60_000,
+  });
 
-  const load = useCallback(async () => {
-    try {
-      const [
-        users,
-        restaurants,
-        active,
-        awaiting,
-        toVerify,
-        ordersAll,
-        ordersLive,
-        ordersDone,
-        confirmedPayments,
-        completedTotals,
-      ] = await Promise.all([
-        supabase.from("profiles").select("id", { count: "exact", head: true }),
-        supabase.from("restaurants").select("id", { count: "exact", head: true }),
-        supabase
-          .from("restaurants")
-          .select("id", { count: "exact", head: true })
-          .eq("status", "active"),
-        supabase
-          .from("restaurants")
-          .select("id", { count: "exact", head: true })
-          .eq("status", "pending_payment"),
-        supabase
-          .from("registration_payments")
-          .select("id", { count: "exact", head: true })
-          .eq("status", "submitted"),
-        supabase.from("orders").select("id", { count: "exact", head: true }),
-        supabase
-          .from("orders")
-          .select("id", { count: "exact", head: true })
-          .in("status", [...LIVE_STATUSES]),
-        supabase
-          .from("orders")
-          .select("id", { count: "exact", head: true })
-          .eq("status", "completed"),
-        supabase.from("registration_payments").select("amount").eq("status", "confirmed"),
-        supabase.from("orders").select("total").eq("status", "completed"),
-      ]);
-
-      setKpis({
-        totalUsers: users.count ?? 0,
-        totalRestaurants: restaurants.count ?? 0,
-        activeRestaurants: active.count ?? 0,
-        awaitingPayment: awaiting.count ?? 0,
-        paymentsToVerify: toVerify.count ?? 0,
-        totalOrders: ordersAll.count ?? 0,
-        liveOrders: ordersLive.count ?? 0,
-        completedOrders: ordersDone.count ?? 0,
-        // The platform's actual income: registration fees, not order value.
-        feeRevenue: (confirmedPayments.data ?? []).reduce(
-          (sum, row) => sum + Number(row.amount ?? 0),
-          0,
-        ),
-        // Food sold through the platform. Money the restaurants take, not us.
-        orderVolume: (completedTotals.data ?? []).reduce(
-          (sum, row) => sum + Number(row.total ?? 0),
-          0,
-        ),
-      });
-      setError(null);
-    } catch (err) {
-      setError(toUserMessage(err, "Failed to load dashboard data"));
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-    const id = setInterval(load, 30_000);
-    return () => clearInterval(id);
-  }, [load]);
+  const error = queryError ? toUserMessage(queryError, "Failed to load dashboard data") : null;
 
   const cards = [
-    { label: "Registered users", value: kpis?.totalUsers, icon: Users },
-    { label: "Restaurants", value: kpis?.totalRestaurants, icon: Store },
-    { label: "Live listings", value: kpis?.activeRestaurants, icon: ChefHat },
-    { label: "Awaiting payment", value: kpis?.awaitingPayment, icon: CreditCard },
-    { label: "Total orders", value: kpis?.totalOrders, icon: Receipt },
-    { label: "Orders in progress", value: kpis?.liveOrders, icon: Receipt },
+    { label: "Registered users", value: kpis?.total_users, icon: Users },
+    { label: "Restaurants", value: kpis?.total_restaurants, icon: Store },
+    { label: "Live listings", value: kpis?.active_restaurants, icon: ChefHat },
+    { label: "Awaiting payment", value: kpis?.awaiting_payment, icon: CreditCard },
+    { label: "Total orders", value: kpis?.total_orders, icon: Receipt },
+    { label: "Orders in progress", value: kpis?.live_orders, icon: Receipt },
   ];
 
   return (
@@ -124,9 +57,9 @@ function AdminOverview() {
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="font-display text-xl font-bold">Overview</h1>
-          <p className="text-sm text-muted-foreground">Refreshes automatically every 30 seconds.</p>
+          <p className="text-sm text-muted-foreground">Refreshes automatically every minute.</p>
         </div>
-        <Button variant="outline" size="sm" onClick={load}>
+        <Button variant="outline" size="sm" onClick={() => void refetch()}>
           <RefreshCw className="h-3.5 w-3.5" />
           Refresh
         </Button>
@@ -138,7 +71,7 @@ function AdminOverview() {
 
       {/* The one thing an admin has to act on, surfaced above everything else
           — an unverified payment is a restaurant sitting invisible, waiting. */}
-      {kpis && kpis.paymentsToVerify > 0 && (
+      {kpis && kpis.payments_to_verify > 0 && (
         <Link
           to="/admin/payments"
           className="flex items-center gap-3 rounded-2xl border border-warning/40 bg-warning/10 p-4 transition-colors hover:bg-warning/20"
@@ -146,8 +79,8 @@ function AdminOverview() {
           <AlertTriangle className="h-5 w-5 shrink-0 text-warning" />
           <div className="min-w-0 flex-1">
             <p className="font-semibold">
-              {kpis.paymentsToVerify} payment{kpis.paymentsToVerify === 1 ? "" : "s"} waiting to be
-              verified
+              {kpis.payments_to_verify} payment{kpis.payments_to_verify === 1 ? "" : "s"} waiting to
+              be verified
             </p>
             <p className="text-sm text-muted-foreground">
               Each one is a restaurant that has paid and can't be found by customers yet.
@@ -178,11 +111,11 @@ function AdminOverview() {
             <Wallet className="h-4 w-4" />
             <span className="text-xs font-medium">Platform revenue (registration fees)</span>
           </div>
-          {kpis === null ? (
+          {!kpis ? (
             <Skeleton className="mt-2 h-8 w-32" />
           ) : (
             <p className="mt-1 font-display text-2xl font-extrabold text-primary">
-              {formatTsh(kpis.feeRevenue)}
+              {formatTsh(Number(kpis.fee_revenue))}
             </p>
           )}
         </Card>
@@ -192,15 +125,15 @@ function AdminOverview() {
             <Receipt className="h-4 w-4" />
             <span className="text-xs font-medium">Food sold through the platform</span>
           </div>
-          {kpis === null ? (
+          {!kpis ? (
             <Skeleton className="mt-2 h-8 w-32" />
           ) : (
             <>
               <p className="mt-1 font-display text-2xl font-extrabold">
-                {formatTsh(kpis.orderVolume)}
+                {formatTsh(Number(kpis.order_volume))}
               </p>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Paid directly to restaurants across {kpis.completedOrders} collected orders — the
+                Paid directly to restaurants across {kpis.completed_orders} collected orders — the
                 platform takes no commission.
               </p>
             </>

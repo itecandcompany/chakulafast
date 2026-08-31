@@ -1,5 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
+import { QueryClientProvider } from "@tanstack/react-query";
 
 import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
@@ -9,6 +10,7 @@ import { I18nProvider } from "@/lib/i18n";
 import InstallBanner from "@/components/InstallBanner";
 import SetupRequired from "@/components/SetupRequired";
 import { isSupabaseConfigured } from "@/integrations/supabase/client";
+import { createQueryClient } from "@/lib/queryClient";
 
 const TITLE = "ChakulaFast — Order food ahead, ready when you arrive";
 const DESCRIPTION =
@@ -142,6 +144,11 @@ function RootShell({ children }: { children: React.ReactNode }) {
 function RootComponent() {
   useEffect(() => registerServiceWorker(), []);
 
+  // Created once per app instance rather than at module scope: on the server a
+  // module-level client would be shared across every concurrent request, so
+  // one visitor could be served another visitor's cached orders.
+  const [queryClient] = useState(createQueryClient);
+
   // Checked before AuthProvider mounts, because that is the first thing to
   // touch the Supabase client — and without credentials it throws during
   // render, which the error boundary then reports as a crash rather than as
@@ -151,15 +158,17 @@ function RootComponent() {
   }
 
   return (
-    <I18nProvider>
-      <AuthProvider>
-        {/* Must render before Outlet: InstallBanner sits in normal document
-            flow (not fixed) specifically so it pushes page content down
-            instead of overlaying it — that only works if it's first. */}
-        <InstallBanner />
-        <Outlet />
-        <Toaster position="top-center" richColors />
-      </AuthProvider>
-    </I18nProvider>
+    <QueryClientProvider client={queryClient}>
+      <I18nProvider>
+        <AuthProvider>
+          {/* Must render before Outlet: InstallBanner sits in normal document
+              flow (not fixed) specifically so it pushes page content down
+              instead of overlaying it — that only works if it's first. */}
+          <InstallBanner />
+          <Outlet />
+          <Toaster position="top-center" richColors />
+        </AuthProvider>
+      </I18nProvider>
+    </QueryClientProvider>
   );
 }
