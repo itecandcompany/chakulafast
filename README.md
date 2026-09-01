@@ -312,6 +312,33 @@ email confirmation and OAuth redirect back correctly.
 
 ---
 
+## Launch checklist — Supabase dashboard
+
+The app enforces what it can in code: RLS on every table, guard triggers on
+every privileged column, server-side password rules, rate limits on every admin
+mutation, and `enforceEmailConfirmed` on every server function. The rest lives
+in the Supabase dashboard and **cannot be set from this repo**.
+
+Before taking real orders:
+
+| Setting                                   | Where                 | Why                                                                                                                                                                                        |
+| ----------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Custom SMTP**                           | Auth → Emails         | The default shared sender is rate-limited to a few messages an hour. This project already hit `over_email_send_rate_limit` during testing — on launch day it would block signups entirely. |
+| **Leaked-password protection**            | Auth → Policies       | Off by default. Checks new passwords against HaveIBeenPwned.                                                                                                                               |
+| **Minimum password length ≥ 8**           | Auth → Policies       | The client checks this too, but the client can be bypassed.                                                                                                                                |
+| **CAPTCHA on signup/signin**              | Auth → Bot protection | Without it, signup is an open endpoint that sends email.                                                                                                                                   |
+| **Shorter JWT expiry + refresh rotation** | Auth → Sessions       | Limits the damage from a stolen token.                                                                                                                                                     |
+| **MFA for admin accounts**                | Auth → MFA            | An admin can confirm payments and change roles.                                                                                                                                            |
+
+Also confirm after the first deploy:
+
+```bash
+curl -sI https://your-domain | grep -iE "content-security-policy|strict-transport"
+```
+
+Both headers are set in `vercel.json`. If the CSP blocks something, the browser
+console names the directive — do not widen it past the origin that failed.
+
 ## Known scope
 
 Deliberate choices, so they don't read as oversights:

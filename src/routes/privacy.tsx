@@ -70,6 +70,13 @@ function PrivacyPage() {
               If you decline location access, everything still works — pick your town by hand
               instead.
             </p>
+            <p className="mt-2 text-muted-foreground">
+              <strong className="text-foreground">One third party sees it.</strong> To work out
+              travel time along real roads we send the two end points of your journey — where you
+              are and the restaurant — to the OpenStreetMap routing service. We send nothing else:
+              no name, no account, no order. If that service is unavailable we fall back to a
+              straight-line estimate calculated on your own device.
+            </p>
           </section>
 
           <section>

@@ -236,7 +236,7 @@ const en = {
   "auth.checkEmail": "Check your email to confirm your account, then sign in.",
   "auth.vendorFeeNotice":
     "Listing your restaurant costs a one-time {fee} registration fee. You'll pay it after creating your account.",
-  "auth.passwordHint": "At least 8 characters.",
+  "auth.passwordHint": "At least 8 characters, with a letter and a number.",
   "auth.browseAsGuest": "Browse without an account",
 
   "install.title": "Install ChakulaFast",
@@ -461,7 +461,7 @@ const sw: Record<TKey, string> = {
   "auth.checkEmail": "Angalia barua pepe yako kuthibitisha akaunti, kisha ingia.",
   "auth.vendorFeeNotice":
     "Kusajili mgahawa wako kunagharimu ada ya usajili ya mara moja ya {fee}. Utailipa baada ya kufungua akaunti.",
-  "auth.passwordHint": "Angalau herufi 8.",
+  "auth.passwordHint": "Angalau herufi 8, zikiwa na herufi na tarakimu.",
   "auth.browseAsGuest": "Vinjari bila akaunti",
 
   "install.title": "Sakinisha ChakulaFast",

@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { enforceEmailConfirmed } from "@/lib/auth.server";
 import { enforceRateLimit } from "@/lib/rateLimit";
 import { getPaymentProvider } from "@/lib/payments";
 import type { PaymentMethod } from "@/lib/payments";
@@ -25,7 +26,7 @@ const submitSchema = z.object({
  * non-VITE_ env var, so the browser can't read it directly.
  */
 export const getBillingContext = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, enforceEmailConfirmed])
   .handler(async ({ context }) => {
     const { data: settings } = await context.supabase
       .from("platform_settings")
@@ -50,7 +51,7 @@ export const getBillingContext = createServerFn({ method: "GET" })
 
 export const submitRegistrationPayment = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => submitSchema.parse(input))
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, enforceEmailConfirmed])
   .handler(async ({ data, context }) => {
     enforceRateLimit("registration-payment", context.userId, { windowMs: 60_000, max: 10 });
 
