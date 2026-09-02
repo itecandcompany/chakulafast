@@ -42,21 +42,95 @@ export function formatKm(km: number | null | undefined) {
 }
 
 /**
- * One-shot browser geolocation, as a promise that never rejects.
+ * Why a location attempt didn't produce a fix.
  *
- * Returning null instead of throwing is deliberate: every caller's fallback
- * is "carry on with the manually chosen town", and a denied permission is a
- * completely normal outcome rather than an error worth surfacing.
+ * None of these are errors in the "something broke" sense — a declined
+ * permission is a completely normal outcome. They exist so the UI can say
+ * which one happened and point at the manual town picker, instead of
+ * spinning on "Finding you…" with nothing to offer.
  */
-export function getCurrentPosition(timeoutMs = 8000): Promise<{ lat: number; lng: number } | null> {
-  if (typeof navigator === "undefined" || !navigator.geolocation) return Promise.resolve(null);
+export type LocationFailure = "unsupported" | "insecure" | "denied" | "timeout" | "unavailable";
+
+export type LocationResult =
+  { ok: true; position: { lat: number; lng: number } } | { ok: false; reason: LocationFailure };
+
+/**
+ * Geolocation is only available on a secure origin.
+ *
+ * Browsers treat localhost as secure, but a phone testing against a dev server
+ * over the LAN (`http://192.168.x.x:5173`) is not — and there `navigator.
+ * geolocation` still *exists*, it just never succeeds. Detecting it up front is
+ * the difference between an explanation and a spinner that never stops.
+ */
+function isSecureForGeolocation(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.isSecureContext === true;
+}
+
+/**
+ * One-shot browser geolocation that is guaranteed to settle.
+ *
+ * The `timeout` option is not enough on its own: per the Geolocation spec its
+ * clock only starts once the user has answered the permission prompt. If the
+ * prompt is ignored — or swiped away on a phone without choosing, which is
+ * extremely common — neither callback ever fires and the caller waits forever.
+ * That is exactly the "stuck on Finding you…" symptom.
+ *
+ * So the browser timeout is kept (it is the one that reports a genuine GPS
+ * fix failure) and wrapped in a wall-clock race that always resolves.
+ */
+export function requestLocation(timeoutMs = 10_000): Promise<LocationResult> {
+  if (typeof navigator === "undefined" || !navigator.geolocation) {
+    return Promise.resolve({ ok: false, reason: "unsupported" });
+  }
+  if (!isSecureForGeolocation()) {
+    return Promise.resolve({ ok: false, reason: "insecure" });
+  }
+
   return new Promise((resolve) => {
+    let settled = false;
+    const finish = (result: LocationResult) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(wall);
+      resolve(result);
+    };
+
+    // The wall clock. Deliberately a little longer than the browser's own
+    // timeout so a real GPS failure reports its own reason first.
+    const wall = setTimeout(() => finish({ ok: false, reason: "timeout" }), timeoutMs + 2000);
+
     navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => resolve(null),
-      { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 30_000 },
+      (pos) =>
+        finish({ ok: true, position: { lat: pos.coords.latitude, lng: pos.coords.longitude } }),
+      (err) =>
+        finish({
+          ok: false,
+          reason:
+            err.code === err.PERMISSION_DENIED
+              ? "denied"
+              : err.code === err.TIMEOUT
+                ? "timeout"
+                : "unavailable",
+        }),
+      // `enableHighAccuracy` asks for GPS rather than the network fix. On a
+      // phone indoors that can take 20+ seconds or never resolve, and for
+      // "which kitchens are near me" a coarse fix is entirely good enough.
+      { enableHighAccuracy: false, timeout: timeoutMs, maximumAge: 60_000 },
     );
   });
+}
+
+/**
+ * Back-compat wrapper: resolves to a position or null, never rejects, and can
+ * no longer hang. Callers that want to explain *why* it failed should use
+ * requestLocation() instead.
+ */
+export async function getCurrentPosition(
+  timeoutMs = 10_000,
+): Promise<{ lat: number; lng: number } | null> {
+  const result = await requestLocation(timeoutMs);
+  return result.ok ? result.position : null;
 }
 
 // ----- OSRM routing (free, no API key) -----

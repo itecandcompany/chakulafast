@@ -69,6 +69,12 @@ const en = {
   "landing.usingLocation": "Using your location",
   "landing.locating": "Finding you…",
   "landing.locationDenied": "Location unavailable — pick your area instead.",
+  "loc.denied":
+    "Location permission was blocked. Allow it in your browser settings, or pick your area below.",
+  "loc.timeout": "Couldn't get a location fix — pick your area below instead.",
+  "loc.unavailable": "Your device couldn't provide a location. Pick your area below.",
+  "loc.unsupported": "This browser doesn't support location. Pick your area below.",
+  "loc.insecure": "Location only works over a secure (https) connection. Pick your area below.",
   "landing.howItWorks": "How it works",
   "landing.step1": "Search a dish",
   "landing.step1Body": "Type what you're craving and see every kitchen nearby that has it.",
@@ -293,6 +299,13 @@ const sw: Record<TKey, string> = {
   "landing.usingLocation": "Inatumia mahali ulipo",
   "landing.locating": "Inatafuta ulipo…",
   "landing.locationDenied": "Mahali hapapatikani — chagua eneo lako badala yake.",
+  "loc.denied":
+    "Ruhusa ya mahali imezuiwa. Iruhusu kwenye mipangilio ya kivinjari, au chagua eneo lako hapa chini.",
+  "loc.timeout": "Imeshindikana kupata mahali ulipo — chagua eneo lako hapa chini.",
+  "loc.unavailable": "Kifaa chako hakikuweza kutoa mahali. Chagua eneo lako hapa chini.",
+  "loc.unsupported": "Kivinjari hiki hakiruhusu mahali. Chagua eneo lako hapa chini.",
+  "loc.insecure":
+    "Mahali hufanya kazi kwa muunganisho salama (https) tu. Chagua eneo lako hapa chini.",
   "landing.howItWorks": "Inavyofanya kazi",
   "landing.step1": "Tafuta chakula",
   "landing.step1Body": "Andika unachotamani uone kila jiko lililo karibu lenye chakula hicho.",

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { getCurrentPosition } from "@/lib/geo";
+import { requestLocation, type LocationFailure } from "@/lib/geo";
 import { DEFAULT_TOWN, findTown, nearestTown, TOWNS } from "@/lib/towns";
 
 const TOWN_KEY = "chakulafast.town";
@@ -12,6 +12,8 @@ export type DiscoveryLocation = {
   /** What distances are measured from: the GPS fix, else the town centre. */
   origin: { lat: number; lng: number };
   locating: boolean;
+  /** Why the last attempt failed, so the UI can explain instead of spin. */
+  locationError: LocationFailure | null;
   /** True once the persisted town has been read — see the note below. */
   ready: boolean;
   setTown: (town: string) => void;
@@ -39,6 +41,7 @@ export function useDiscoveryLocation(): DiscoveryLocation {
   const [town, setTownState] = useState<string>(DEFAULT_TOWN);
   const [position, setPosition] = useState<{ lat: number; lng: number } | null>(null);
   const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState<LocationFailure | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -66,9 +69,16 @@ export function useDiscoveryLocation(): DiscoveryLocation {
 
   const requestPosition = useCallback(async () => {
     setLocating(true);
+    setLocationError(null);
     try {
-      const fix = await getCurrentPosition();
-      if (!fix) return false;
+      // requestLocation always settles — it can no longer leave `locating`
+      // stuck true when a permission prompt goes unanswered.
+      const result = await requestLocation();
+      if (!result.ok) {
+        setLocationError(result.reason);
+        return false;
+      }
+      const fix = result.position;
       setPosition(fix);
       // Keep the visible town label honest about where the customer is.
       const near = nearestTown(fix);
@@ -91,5 +101,15 @@ export function useDiscoveryLocation(): DiscoveryLocation {
   const townCentre = findTown(town) ?? TOWNS[0];
   const origin = position ?? { lat: townCentre.lat, lng: townCentre.lng };
 
-  return { town, position, origin, locating, ready, setTown, requestPosition, clearPosition };
+  return {
+    town,
+    position,
+    origin,
+    locating,
+    locationError,
+    ready,
+    setTown,
+    requestPosition,
+    clearPosition,
+  };
 }

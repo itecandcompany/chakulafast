@@ -21,6 +21,7 @@ import { POPULAR_DISHES } from "@/lib/menuCategories";
 import { TOWNS } from "@/lib/towns";
 import { fetchActiveTowns, fetchNearbyRestaurants, type NearbyRestaurant } from "@/lib/search";
 import { useDiscoveryLocation } from "@/hooks/useDiscoveryLocation";
+import { LOCATION_ERROR_KEY } from "@/lib/locationErrors";
 
 export const Route = createFileRoute("/")({ component: Landing });
 
@@ -155,6 +156,14 @@ function Landing() {
                   : t("landing.useMyLocation")}
             </button>
           </div>
+
+          {/* Location is an accelerant, never a requirement — so a failure
+              explains itself and points at the area picker just above. */}
+          {location.locationError && (
+            <p className="mt-2 rounded-lg bg-primary-foreground/10 px-3 py-2 text-xs text-primary-foreground/90">
+              {t(LOCATION_ERROR_KEY[location.locationError])}
+            </p>
+          )}
         </div>
       </header>
 

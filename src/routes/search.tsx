@@ -23,6 +23,7 @@ import {
   type SearchFilters,
 } from "@/lib/search";
 import { useDiscoveryLocation } from "@/hooks/useDiscoveryLocation";
+import { LOCATION_ERROR_KEY } from "@/lib/locationErrors";
 import { useAddToCart } from "@/hooks/useAddToCart";
 
 // Filters live in the URL so a result list can be shared, bookmarked and
@@ -292,6 +293,12 @@ function SearchPage() {
             <LocateFixed className="h-3.5 w-3.5" />
             {locationCtx.locating ? t("landing.locating") : t("landing.useMyLocation")}
           </button>
+        )}
+
+        {locationCtx.locationError && (
+          <p className="mb-3 rounded-xl bg-muted p-3 text-xs text-muted-foreground">
+            {t(LOCATION_ERROR_KEY[locationCtx.locationError])}
+          </p>
         )}
 
         {error && (
