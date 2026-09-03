@@ -59,6 +59,13 @@ create or replace function storage.foldername(name text) returns text[]
 language sql immutable as $fn$ select string_to_array(name, '/') $fn$;
 
 create publication supabase_realtime;
+
+-- Supabase grants EXECUTE on public functions to anon/authenticated through
+-- ALTER DEFAULT PRIVILEGES, which applies as each function is *created*.
+-- That distinction is load-bearing: a blanket "grant execute on all functions"
+-- run after the migrations would silently re-grant everything the migrations
+-- deliberately revoked, and every REVOKE in the schema would go untested.
+alter default privileges in schema public grant execute on functions to anon, authenticated;
 `;
 
 // pg_trgm is loaded so the trigram index and the `<%` word-similarity
@@ -611,7 +618,6 @@ await asService();
 await db.exec(`
   grant usage on schema public to anon, authenticated;
   grant select, insert, update, delete on all tables in schema public to anon, authenticated;
-  grant execute on all functions in schema public to anon, authenticated;
 `);
 
 // A second customer, to prove orders aren't visible across accounts.
@@ -734,6 +740,75 @@ check(
   selfConfirm.rows.length === 0,
   "vendor cannot confirm their own payment (0 rows affected by RLS)",
 );
+
+console.log("\n=== kitchen capacity (order throttling) ===");
+await asService();
+
+// Opt-in by default: a restaurant that has never touched the setting must
+// behave exactly as it did before this feature existed.
+const unlimited = await one(`select * from public.check_kitchen_slot('${other.id}', 20, 30)`);
+check(
+  unlimited.available === true && Number(unlimited.capacity) === 0,
+  "capacity 0 leaves the kitchen unthrottled",
+);
+
+// Now the kitchen declares it can cook one order at a time.
+await db.exec(`update public.restaurants
+  set kitchen_capacity = 1, avg_prep_minutes = 20 where id = '${other.id}'`);
+
+const firstSlot = await one(`insert into public.orders (customer_id, restaurant_id, arrival_minutes)
+  values ('${customer.id}', '${other.id}', 30) returning id`);
+check(!!firstSlot.id, "the first pre-order fits an empty kitchen");
+
+const fullSlot = await one(`select * from public.check_kitchen_slot('${other.id}', 20, 30)`);
+check(
+  fullSlot.available === false && Number(fullSlot.busy) === 1,
+  `a second order wanting the same window is refused (busy ${fullSlot.busy}/${fullSlot.capacity})`,
+);
+check(
+  Number(fullSlot.suggested_minutes) > 30,
+  `and a later arrival is offered instead of a flat no (${fullSlot.suggested_minutes} min)`,
+);
+
+// check_kitchen_slot() is advice the UI shows; this is the rule. Two customers
+// loading the last slot at once would both be told yes, so the INSERT itself
+// has to be the thing that says no.
+let overbooked = false;
+try {
+  await db.exec(`insert into public.orders (customer_id, restaurant_id, arrival_minutes)
+    values ('${customer.id}', '${other.id}', 30)`);
+} catch (e) {
+  overbooked = /KITCHEN_FULL/.test(e.message);
+}
+check(overbooked, "the database refuses the overbooked order, not just the UI");
+
+// Advice nobody can act on is worse than none: book the exact slot it named.
+const suggested = Number(fullSlot.suggested_minutes);
+const laterSlot = await one(`insert into public.orders (customer_id, restaurant_id, arrival_minutes)
+  values ('${customer.id}', '${other.id}', ${suggested}) returning id`);
+check(!!laterSlot.id, `the slot the system suggested is genuinely bookable (${suggested} min)`);
+
+await db.exec(`update public.orders set status = 'cancelled'
+  where id in ('${firstSlot.id}', '${laterSlot.id}')`);
+const freed = await one(`select * from public.check_kitchen_slot('${other.id}', 20, 30)`);
+check(
+  freed.available === true,
+  "a cancelled order releases the kitchen instead of holding the slot forever",
+);
+
+// kitchen_load() counts other people's orders, so it is SECURITY DEFINER and
+// must not be reachable from a browser.
+check(
+  await denied(
+    "authenticated",
+    customer.id,
+    `select public.kitchen_load('${other.id}', now(), now() + interval '1 hour')`,
+  ),
+  "a customer cannot count another kitchen's live orders",
+);
+
+await asService();
+await db.exec(`update public.restaurants set kitchen_capacity = 0 where id = '${other.id}'`);
 
 console.log(
   `\n${"=".repeat(52)}\n${failures === 0 ? "ALL CHECKS PASSED" : failures + " CHECK(S) FAILED"}\n${"=".repeat(52)}`,
