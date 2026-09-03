@@ -5,6 +5,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { enforceEmailConfirmed } from "@/lib/auth.server";
 import type { Database } from "@/integrations/supabase/types";
 import { enforceRateLimit } from "@/lib/rateLimit";
+import { recordAdminAction } from "@/lib/auditLog.server";
 
 // Admin-only listing and payment moderation. These run server-side so they
 // can use the service-role client (client.server.ts) — never expose that key
@@ -44,6 +45,16 @@ async function requireAdmin(context: { supabase: SupabaseClient<Database>; userI
  * in cash at the office still has to go live — so it is allowed, but it is
  * never implicit: it only happens when an admin explicitly picks 'active'.
  */
+/** The listing's name right now, for the audit entry. */
+async function restaurantName(supabaseAdmin: SupabaseClient<Database>, restaurantId: string) {
+  const { data } = await supabaseAdmin
+    .from("restaurants")
+    .select("name")
+    .eq("id", restaurantId)
+    .maybeSingle();
+  return data?.name ?? null;
+}
+
 export const adminSetRestaurantStatus = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => statusSchema.parse(input))
   .middleware([requireSupabaseAuth, enforceEmailConfirmed])
@@ -66,6 +77,15 @@ export const adminSetRestaurantStatus = createServerFn({ method: "POST" })
       .eq("id", data.restaurantId);
 
     if (error) throw new Error("Unable to update the listing");
+
+    await recordAdminAction(supabaseAdmin, {
+      actorId: context.userId,
+      action: `restaurant.${data.status}`,
+      subjectType: "restaurant",
+      subjectId: data.restaurantId,
+      subjectLabel: await restaurantName(supabaseAdmin, data.restaurantId),
+      detail: data.reason ?? null,
+    });
 
     return { ok: true as const };
   });
@@ -110,6 +130,15 @@ export const adminConfirmPayment = createServerFn({ method: "POST" })
 
     if (error) throw new Error("Unable to confirm that payment");
 
+    await recordAdminAction(supabaseAdmin, {
+      actorId: context.userId,
+      action: "payment.confirmed",
+      subjectType: "payment",
+      subjectId: data.paymentId,
+      subjectLabel: await restaurantName(supabaseAdmin, payment.restaurant_id),
+      detail: data.note ?? null,
+    });
+
     return { ok: true as const, alreadyConfirmed: false };
   });
 
@@ -124,7 +153,7 @@ export const adminRejectPayment = createServerFn({ method: "POST" })
 
     const { data: payment } = await supabaseAdmin
       .from("registration_payments")
-      .select("status")
+      .select("status, restaurant_id")
       .eq("id", data.paymentId)
       .maybeSingle();
 
@@ -142,6 +171,15 @@ export const adminRejectPayment = createServerFn({ method: "POST" })
       .eq("id", data.paymentId);
 
     if (error) throw new Error("Unable to reject that payment");
+
+    await recordAdminAction(supabaseAdmin, {
+      actorId: context.userId,
+      action: "payment.rejected",
+      subjectType: "payment",
+      subjectId: data.paymentId,
+      subjectLabel: await restaurantName(supabaseAdmin, payment.restaurant_id),
+      detail: data.note ?? null,
+    });
 
     return { ok: true as const };
   });
@@ -175,9 +213,21 @@ export const adminDeleteRestaurant = createServerFn({ method: "POST" })
       );
     }
 
+    // Read the name *before* the delete: afterwards there is nothing to read,
+    // and an audit entry reading "deleted restaurant" answers nothing.
+    const doomedName = await restaurantName(supabaseAdmin, data.restaurantId);
+
     const { error } = await supabaseAdmin.from("restaurants").delete().eq("id", data.restaurantId);
 
     if (error) throw new Error("Unable to delete that listing");
+
+    await recordAdminAction(supabaseAdmin, {
+      actorId: context.userId,
+      action: "restaurant.deleted",
+      subjectType: "restaurant",
+      subjectId: data.restaurantId,
+      subjectLabel: doomedName,
+    });
 
     return { ok: true as const };
   });

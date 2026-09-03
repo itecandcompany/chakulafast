@@ -8,6 +8,26 @@ export type Database = {
   };
   public: {
     Tables: {
+      admin_actions: {
+        Row: {
+          action: string;
+          actor_id: string | null;
+          actor_name: string | null;
+          created_at: string;
+          detail: string | null;
+          id: string;
+          subject_id: string | null;
+          subject_label: string | null;
+          subject_type: string;
+        };
+        // Insert and Update are deliberately empty of writable fields: the
+        // table is append-only and only the service role writes to it, via
+        // log_admin_action(). Nothing in the client should be able to compile
+        // a write to the record of what administrators did.
+        Insert: Record<string, never>;
+        Update: Record<string, never>;
+        Relationships: [];
+      };
       menu_items: {
         Row: {
           category: Database["public"]["Enums"]["menu_category"];
@@ -244,6 +264,7 @@ export type Database = {
       };
       platform_settings: {
         Row: {
+          bootstrap_admin_email: string | null;
           currency: string;
           id: boolean;
           payment_instructions: string | null;
@@ -252,6 +273,7 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          bootstrap_admin_email?: string | null;
           currency?: string;
           id?: boolean;
           payment_instructions?: string | null;
@@ -260,6 +282,11 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          // bootstrap_admin_email is deliberately absent. It is a one-shot
+          // claim that bootstrap_admin() burns on use, and an admin console
+          // able to write it could re-open the first-admin door at will.
+          // Leaving it out means the settings form cannot compile a write to
+          // it, rather than relying on nobody thinking to add the field.
           currency?: string;
           payment_instructions?: string | null;
           registration_fee_tzs?: number;
@@ -573,6 +600,17 @@ export type Database = {
       haversine_km: {
         Args: { lat1: number; lng1: number; lat2: number; lng2: number };
         Returns: number;
+      };
+      log_admin_action: {
+        Args: {
+          _actor: string;
+          _action: string;
+          _subject_type: string;
+          _subject_id: string | null;
+          _subject_label: string | null;
+          _detail?: string | null;
+        };
+        Returns: undefined;
       };
       bootstrap_available: {
         Args: Record<PropertyKey, never>;

@@ -5,6 +5,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { enforceEmailConfirmed } from "@/lib/auth.server";
 import type { Database } from "@/integrations/supabase/types";
 import { enforceRateLimit } from "@/lib/rateLimit";
+import { recordAdminAction } from "@/lib/auditLog.server";
 
 // Admin-only user management actions. These run server-side so they can use
 // the service-role client (client.server.ts) — never expose that key to the
@@ -30,6 +31,17 @@ async function requireAdmin(context: { supabase: SupabaseClient<Database>; userI
     .eq("role", "admin")
     .maybeSingle();
   if (!data) throw new Response("Forbidden", { status: 403 });
+}
+
+/** The display name, read before the log entry is written so the row stays
+ *  readable if the account is later removed. */
+async function nameOf(supabaseAdmin: SupabaseClient<Database>, userId: string) {
+  const { data } = await supabaseAdmin
+    .from("profiles")
+    .select("full_name")
+    .eq("id", userId)
+    .maybeSingle();
+  return data?.full_name ?? null;
 }
 
 async function countAdmins(supabaseAdmin: SupabaseClient<Database>) {
@@ -98,6 +110,14 @@ export const adminSetUserRole = createServerFn({ method: "POST" })
       .insert({ user_id: data.targetUserId, role: data.role });
     if (insertError) throw new Error("Unable to update role");
 
+    await recordAdminAction(supabaseAdmin, {
+      actorId: context.userId,
+      action: `user.role.${data.role}`,
+      subjectType: "user",
+      subjectId: data.targetUserId,
+      subjectLabel: await nameOf(supabaseAdmin, data.targetUserId),
+    });
+
     return { ok: true as const };
   });
 
@@ -142,6 +162,14 @@ export const adminSetUserSuspended = createServerFn({ method: "POST" })
         .update({ is_accepting_orders: false })
         .eq("owner_id", data.targetUserId);
     }
+
+    await recordAdminAction(supabaseAdmin, {
+      actorId: context.userId,
+      action: data.suspended ? "user.suspended" : "user.restored",
+      subjectType: "user",
+      subjectId: data.targetUserId,
+      subjectLabel: await nameOf(supabaseAdmin, data.targetUserId),
+    });
 
     return { ok: true as const };
   });

@@ -1,5 +1,14 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { CreditCard, Home, LayoutDashboard, Receipt, Store, Users } from "lucide-react";
+import {
+  CreditCard,
+  Home,
+  LayoutDashboard,
+  Receipt,
+  ScrollText,
+  Settings,
+  Store,
+  Users,
+} from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -17,6 +26,8 @@ const ITEMS = [
   { label: "Payments", url: "/admin/payments", icon: CreditCard },
   { label: "Orders", url: "/admin/orders", icon: Receipt },
   { label: "Users", url: "/admin/users", icon: Users },
+  { label: "Activity", url: "/admin/activity", icon: ScrollText },
+  { label: "Settings", url: "/admin/settings", icon: Settings },
 ] as const;
 
 export default function AdminSidebar() {

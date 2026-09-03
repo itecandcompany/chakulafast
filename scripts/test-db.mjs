@@ -1053,6 +1053,79 @@ check(
   `the new UPDATE policy did not hand vendors self-confirmation (still ${cheapAfter.status})`,
 );
 
+console.log("\n=== admin audit log ===");
+await asService();
+
+await db.exec(`select public.log_admin_action('${sneaky.id}', 'restaurant.suspended',
+  'restaurant', '${other.id}', 'Other Place', 'Selling outside declared hours')`);
+
+const entry = await one(`select actor_name, action, subject_label, detail
+  from public.admin_actions order by created_at desc limit 1`);
+check(
+  entry.action === "restaurant.suspended" && entry.subject_label === "Other Place",
+  `an action is recorded with its subject named at the time (${entry.action})`,
+);
+check(
+  entry.detail === "Selling outside declared hours",
+  "the reason the admin typed is kept with it",
+);
+check(entry.actor_name != null, `the actor is resolved to a name (${entry.actor_name})`);
+
+// The label has to outlive the thing it describes, or the log answers
+// "who deleted this?" with "deleted restaurant". Needs a listing with no
+// order history -- the orders FK is RESTRICT, which is what makes the
+// console offer suspend instead of delete once a kitchen has traded.
+const doomedOwner = await one(
+  `insert into auth.users (email, raw_user_meta_data)
+   values ('doomed@test', '{"full_name":"Doomed","role":"restaurant"}'::jsonb) returning id`,
+);
+const doomed = await one(`
+  insert into public.restaurants (owner_id, name, slug, town, address, lat, lng)
+  values ('${doomedOwner.id}', 'Closing Soon', 'closing-soon', 'Moshi', 'Y', -3.35, 37.35)
+  returning id`);
+await db.exec(`select public.log_admin_action('${sneaky.id}', 'restaurant.deleted',
+  'restaurant', '${doomed.id}', 'Closing Soon', 'Owner asked to be removed')`);
+await db.exec(`delete from public.restaurants where id = '${doomed.id}'`);
+const survived = await one(`select subject_label, subject_id from public.admin_actions
+  where action = 'restaurant.deleted' order by created_at desc limit 1`);
+check(
+  survived.subject_label === "Closing Soon",
+  "the entry still names the restaurant after it is deleted",
+);
+
+// Append-only, against the service role itself -- RLS already stops clients.
+let edited = false;
+try {
+  await db.exec(`update public.admin_actions set detail = 'something else'`);
+} catch (e) {
+  edited = /append-only/.test(e.message);
+}
+check(edited, "an existing entry cannot be rewritten, even by the service role");
+
+// A client writing its own audit trail would make the log worthless.
+check(
+  await denied(
+    "authenticated",
+    customer.id,
+    `select public.log_admin_action('${customer.id}', 'x', 'user', null, 'x', null)`,
+  ),
+  "a signed-in user cannot write to the audit log",
+);
+check(
+  await denied(
+    "authenticated",
+    customer.id,
+    `insert into public.admin_actions (action, subject_type) values ('x', 'user')`,
+  ),
+  "and cannot insert into the table directly",
+);
+
+// Reading is admin-only: the log names people and carries suspension reasons.
+const readable = await as("authenticated", sneaky.id, `select id from public.admin_actions`);
+check(readable.rows.length >= 1, "an admin can read the log");
+const hidden = await as("authenticated", customer.id, `select id from public.admin_actions`);
+check(hidden.rows.length === 0, "a customer sees none of it");
+
 console.log(
   `\n${"=".repeat(52)}\n${failures === 0 ? "ALL CHECKS PASSED" : failures + " CHECK(S) FAILED"}\n${"=".repeat(52)}`,
 );

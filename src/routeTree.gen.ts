@@ -20,9 +20,11 @@ import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as VendorRouteImport } from './routes/vendor'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as AdminActivityRouteImport } from './routes/admin.activity'
 import { Route as AdminOrdersRouteImport } from './routes/admin.orders'
 import { Route as AdminPaymentsRouteImport } from './routes/admin.payments'
 import { Route as AdminRestaurantsRouteImport } from './routes/admin.restaurants'
+import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as RSlugRouteImport } from './routes/r.$slug'
 import { Route as VendorIndexRouteImport } from './routes/vendor.index'
@@ -87,6 +89,11 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminActivityRoute = AdminActivityRouteImport.update({
+  id: '/activity',
+  path: '/activity',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminOrdersRoute = AdminOrdersRouteImport.update({
   id: '/orders',
   path: '/orders',
@@ -100,6 +107,11 @@ const AdminPaymentsRoute = AdminPaymentsRouteImport.update({
 const AdminRestaurantsRoute = AdminRestaurantsRouteImport.update({
   id: '/restaurants',
   path: '/restaurants',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSettingsRoute = AdminSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminUsersRoute = AdminUsersRouteImport.update({
@@ -154,9 +166,11 @@ export interface FileRoutesByFullPath {
   '/privacy': typeof PrivacyRoute
   '/search': typeof SearchRoute
   '/vendor': typeof VendorRouteWithChildren
+  '/admin/activity': typeof AdminActivityRoute
   '/admin/orders': typeof AdminOrdersRoute
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/restaurants': typeof AdminRestaurantsRoute
+  '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
   '/r/$slug': typeof RSlugRoute
   '/vendor/billing': typeof VendorBillingRoute
@@ -176,9 +190,11 @@ export interface FileRoutesByTo {
   '/orders': typeof OrdersRoute
   '/privacy': typeof PrivacyRoute
   '/search': typeof SearchRoute
+  '/admin/activity': typeof AdminActivityRoute
   '/admin/orders': typeof AdminOrdersRoute
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/restaurants': typeof AdminRestaurantsRoute
+  '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
   '/r/$slug': typeof RSlugRoute
   '/vendor/billing': typeof VendorBillingRoute
@@ -201,9 +217,11 @@ export interface FileRoutesById {
   '/privacy': typeof PrivacyRoute
   '/search': typeof SearchRoute
   '/vendor': typeof VendorRouteWithChildren
+  '/admin/activity': typeof AdminActivityRoute
   '/admin/orders': typeof AdminOrdersRoute
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/restaurants': typeof AdminRestaurantsRoute
+  '/admin/settings': typeof AdminSettingsRoute
   '/admin/users': typeof AdminUsersRoute
   '/r/$slug': typeof RSlugRoute
   '/vendor/billing': typeof VendorBillingRoute
@@ -227,9 +245,11 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/search'
     | '/vendor'
+    | '/admin/activity'
     | '/admin/orders'
     | '/admin/payments'
     | '/admin/restaurants'
+    | '/admin/settings'
     | '/admin/users'
     | '/r/$slug'
     | '/vendor/billing'
@@ -249,9 +269,11 @@ export interface FileRouteTypes {
     | '/orders'
     | '/privacy'
     | '/search'
+    | '/admin/activity'
     | '/admin/orders'
     | '/admin/payments'
     | '/admin/restaurants'
+    | '/admin/settings'
     | '/admin/users'
     | '/r/$slug'
     | '/vendor/billing'
@@ -273,9 +295,11 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/search'
     | '/vendor'
+    | '/admin/activity'
     | '/admin/orders'
     | '/admin/payments'
     | '/admin/restaurants'
+    | '/admin/settings'
     | '/admin/users'
     | '/r/$slug'
     | '/vendor/billing'
@@ -380,6 +404,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/activity': {
+      id: '/admin/activity'
+      path: '/activity'
+      fullPath: '/admin/activity'
+      preLoaderRoute: typeof AdminActivityRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/orders': {
       id: '/admin/orders'
       path: '/orders'
@@ -399,6 +430,13 @@ declare module '@tanstack/react-router' {
       path: '/restaurants'
       fullPath: '/admin/restaurants'
       preLoaderRoute: typeof AdminRestaurantsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/settings': {
+      id: '/admin/settings'
+      path: '/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AdminSettingsRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/users': {
@@ -461,17 +499,21 @@ declare module '@tanstack/react-router' {
 }
 
 interface AdminRouteChildren {
+  AdminActivityRoute: typeof AdminActivityRoute
   AdminOrdersRoute: typeof AdminOrdersRoute
   AdminPaymentsRoute: typeof AdminPaymentsRoute
   AdminRestaurantsRoute: typeof AdminRestaurantsRoute
+  AdminSettingsRoute: typeof AdminSettingsRoute
   AdminUsersRoute: typeof AdminUsersRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminActivityRoute: AdminActivityRoute,
   AdminOrdersRoute: AdminOrdersRoute,
   AdminPaymentsRoute: AdminPaymentsRoute,
   AdminRestaurantsRoute: AdminRestaurantsRoute,
+  AdminSettingsRoute: AdminSettingsRoute,
   AdminUsersRoute: AdminUsersRoute,
   AdminIndexRoute: AdminIndexRoute,
 }
