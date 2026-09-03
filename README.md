@@ -305,6 +305,16 @@ Default flow (`PAYMENT_PROVIDER=manual`):
 Change the amount or the payment instructions in `platform_settings` — no
 migration needed.
 
+### Automatic activation when a reference reconciles — _not switched on_
+
+The registration fee is collected **in cash** today, so nothing auto-confirms:
+with no rows in `received_payments`, every payment waits for an admin exactly
+as it did before. The mechanism below is built, tested and idle, and the app
+says so — it is listed under "Coming soon" on the landing page, the billing
+page steers vendors to cash, and the admin panel is badged _Upcoming_.
+
+To switch it on, start recording payments in the ledger. Nothing else changes.
+
 ### Automatic activation when a reference reconciles
 
 A human ticking off every registration is a person standing between a

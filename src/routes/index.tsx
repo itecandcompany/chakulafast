@@ -19,6 +19,7 @@ import { useAuth } from "@/lib/auth";
 import { formatKm, formatTsh } from "@/lib/geo";
 import { POPULAR_DISHES } from "@/lib/menuCategories";
 import { TOWNS } from "@/lib/towns";
+import { UPCOMING_FEATURES } from "@/lib/upcoming";
 import { fetchActiveTowns, fetchNearbyRestaurants, type NearbyRestaurant } from "@/lib/search";
 import { useDiscoveryLocation } from "@/hooks/useDiscoveryLocation";
 import { LOCATION_ERROR_KEY } from "@/lib/locationErrors";
@@ -296,6 +297,27 @@ function Landing() {
               </li>
             ))}
           </ol>
+        </section>
+
+        {/* ---------- Coming soon ---------- */}
+        <section>
+          <h2 className="font-display text-lg font-bold">{t("upcoming.title")}</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{t("upcoming.subtitle")}</p>
+          <ul className="mt-3 space-y-2">
+            {UPCOMING_FEATURES.map((feature) => (
+              <li key={feature.id} className="rounded-2xl border border-dashed bg-card/50 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="font-medium">{t(feature.title)}</h3>
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    {t("upcoming.badge")}
+                  </span>
+                </div>
+                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                  {t(feature.body)}
+                </p>
+              </li>
+            ))}
+          </ul>
         </section>
 
         {/* ---------- Vendor CTA ---------- */}

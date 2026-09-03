@@ -81,10 +81,15 @@ export default function ReceivedPaymentsPanel() {
       <div className="flex items-center gap-2">
         <Banknote className="h-4 w-4 text-primary" />
         <h2 className="font-display text-base font-bold">Money received</h2>
+        <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          Upcoming
+        </span>
       </div>
       <p className="-mt-2 text-sm text-muted-foreground">
-        Enter each mobile-money payment as it lands. When a restaurant submits a matching reference,
-        its listing activates on its own — no approval needed.
+        Registration fees are collected in cash for now, so this sits idle: with nothing recorded
+        here, nothing auto-confirms and every payment waits for you below. It is ready for the day
+        mobile money is switched on — enter each payment as it lands, and a restaurant submitting a
+        matching reference activates itself.
       </p>
 
       <form onSubmit={record} className="grid gap-2 sm:grid-cols-[2fr_1fr_1.5fr_auto]">

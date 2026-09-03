@@ -32,7 +32,7 @@ function VendorBilling() {
 
   const [context, setContext] = useState<BillingContext | null>(null);
   const [payments, setPayments] = useState<Payment[] | null>(null);
-  const [method, setMethod] = useState<PaymentMethod>("mpesa");
+  const [method, setMethod] = useState<PaymentMethod>("cash");
   const [reference, setReference] = useState("");
   const [msisdn, setMsisdn] = useState(restaurant.phone ?? "");
   const [submitting, setSubmitting] = useState(false);
@@ -197,6 +197,13 @@ function VendorBilling() {
                       ))}
                     </SelectContent>
                   </Select>
+                  {method !== "cash" && (
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                      Mobile money is not switched on yet — the fee is collected in cash for now.
+                      Pick <span className="font-medium">Cash</span> and an admin will activate your
+                      listing once it&apos;s received.
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -216,19 +223,30 @@ function VendorBilling() {
                 {context.provider.requiresManualConfirmation && (
                   <div>
                     <label htmlFor="billing-reference" className="mb-1.5 block text-sm font-medium">
-                      Transaction reference
+                      Transaction reference{" "}
+                      {method === "cash" && (
+                        <span className="font-normal text-muted-foreground">(not needed)</span>
+                      )}
                     </label>
                     <Input
                       id="billing-reference"
-                      required
+                      // Cash has no transaction ID. Demanding one would leave a
+                      // vendor who has already handed over the money unable to
+                      // submit anything at all.
+                      required={method !== "cash"}
+                      disabled={method === "cash"}
                       minLength={3}
                       maxLength={64}
-                      value={reference}
+                      value={method === "cash" ? "" : reference}
                       onChange={(e) => setReference(e.target.value)}
-                      placeholder="From your confirmation SMS"
+                      placeholder={
+                        method === "cash" ? "Paid in person" : "From your confirmation SMS"
+                      }
                     />
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Copy it exactly — it's what we match against the till statement.
+                      {method === "cash"
+                        ? "Hand the fee to the ChakulaFast team and submit this — we'll activate your listing once it's received."
+                        : "Copy it exactly — it's what we match against the till statement."}
                     </p>
                   </div>
                 )}

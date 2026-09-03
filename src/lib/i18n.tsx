@@ -85,6 +85,15 @@ const en = {
   "landing.nearbyTitle": "Kitchens around you",
   "landing.nearbyEmpty": "No restaurants listed in this area yet.",
   "landing.viewMenu": "View menu",
+  "upcoming.title": "Coming soon",
+  "upcoming.subtitle": "Being built now. Everything below is planned, not promised.",
+  "upcoming.badge": "Coming soon",
+  "upcoming.mobileMoney": "Register by M-Pesa, Tigo Pesa or Airtel Money",
+  "upcoming.mobileMoneyBody":
+    "Restaurants pay the 5,000 TSh registration fee in cash today. Mobile money is next: a payment that reconciles will publish the listing on its own, at any hour.",
+  "upcoming.sms": "A text message when your food is ready",
+  "upcoming.smsBody":
+    "Alerts already reach you while the app is open. SMS, for when it isn't, is next.",
   "landing.vendorCta": "Own a restaurant or hotel?",
   "landing.vendorCtaBody": "List your kitchen and start taking pre-orders.",
   "landing.vendorCtaButton": "Register your restaurant",
@@ -325,6 +334,15 @@ const sw: Record<TKey, string> = {
   "landing.nearbyTitle": "Majiko yaliyo karibu nawe",
   "landing.nearbyEmpty": "Bado hakuna mgahawa uliosajiliwa katika eneo hili.",
   "landing.viewMenu": "Ona menyu",
+  "upcoming.title": "Yanakuja hivi karibuni",
+  "upcoming.subtitle": "Yanaendelea kutengenezwa. Yaliyo hapa chini yamepangwa, si ahadi.",
+  "upcoming.badge": "Inakuja",
+  "upcoming.mobileMoney": "Jisajili kwa M-Pesa, Tigo Pesa au Airtel Money",
+  "upcoming.mobileMoneyBody":
+    "Kwa sasa migahawa hulipa ada ya usajili ya TSh 5,000 kwa fedha taslimu. Malipo ya simu yanafuata: malipo yanayolingana yataweka tangazo hewani yenyewe, saa yoyote.",
+  "upcoming.sms": "Ujumbe wa simu chakula kikiwa tayari",
+  "upcoming.smsBody":
+    "Tayari unapata taarifa ukiwa kwenye app. SMS, kwa wakati usiokuwepo, inafuata.",
   "landing.vendorCta": "Una mgahawa au hoteli?",
   "landing.vendorCtaBody": "Sajili jiko lako uanze kupokea oda za mapema.",
   "landing.vendorCtaButton": "Sajili mgahawa wako",
