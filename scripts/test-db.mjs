@@ -810,6 +810,94 @@ check(
 await asService();
 await db.exec(`update public.restaurants set kitchen_capacity = 0 where id = '${other.id}'`);
 
+console.log("\n=== first-admin bootstrap ===");
+
+await asService();
+// The claimant's mailbox. Set first so the "already owned" case below is
+// testing the admin-exists guard and nothing else.
+await db.exec(`update auth.users set email = 'gene@admin.com' where id = '${sneaky.id}'`);
+
+// Set up the closed case explicitly instead of relying on whatever roles
+// earlier sections happened to leave behind — a guard this load-bearing
+// should not be tested against inherited state.
+await db.exec(`insert into public.user_roles (user_id, role)
+  values ('${owner.id}', 'admin') on conflict (user_id, role) do nothing`);
+const shutWhileAdminExists = await one(`select public.bootstrap_available() a`);
+check(
+  shutWhileAdminExists.a === false,
+  "bootstrap reports itself unavailable while an admin exists",
+);
+
+// The advisory flag and the function have to agree; the flag only decides
+// whether a button is drawn, so the refusal has to live in the function.
+let closedForReal = false;
+try {
+  await as("authenticated", sneaky.id, `select public.bootstrap_admin()`);
+} catch (e) {
+  closedForReal = /BOOTSTRAP_CLOSED/.test(e.message);
+}
+check(closedForReal, "and the function itself refuses while the platform has an owner");
+
+// Strip every admin to recreate a fresh, un-owned platform.
+await asService();
+await db.exec(`delete from public.user_roles where role = 'admin'`);
+await db.exec(
+  `update public.platform_settings set bootstrap_admin_email = 'gene@admin.com' where id`,
+);
+const bootstrapOpen = await one(`select public.bootstrap_available() a`);
+check(bootstrapOpen.a === true, "with no admin and an unused claim, bootstrap is available");
+
+// The named mailbox is the whole gate: a signed-in stranger must bounce.
+let wrongAccount = false;
+try {
+  await as("authenticated", customer.id, `select public.bootstrap_admin()`);
+} catch (e) {
+  wrongAccount = /BOOTSTRAP_NOT_ELIGIBLE/.test(e.message);
+}
+check(wrongAccount, "a signed-in stranger cannot claim the first admin seat");
+
+// ...and anon cannot even reach the function.
+check(
+  await denied("anon", null, `select public.bootstrap_admin()`),
+  "an anonymous visitor cannot call the bootstrap at all",
+);
+
+// The real claimant.
+const claimed = await as("authenticated", sneaky.id, `select public.bootstrap_admin() v`);
+check(
+  claimed.rows[0].v === "gene@admin.com",
+  `the named account claims the admin seat (${claimed.rows[0].v})`,
+);
+
+await asService();
+const promoted = await one(`select role from public.profiles where id = '${sneaky.id}'`);
+check(
+  promoted.role === "admin",
+  `profiles.role follows user_roles through the sync trigger (${promoted.role})`,
+);
+
+// The ticket is burned, so a second call fails even for the right account.
+let reused = false;
+try {
+  await as("authenticated", sneaky.id, `select public.bootstrap_admin()`);
+} catch (e) {
+  reused = /BOOTSTRAP_CLOSED/.test(e.message);
+}
+check(reused, "the claim cannot be used twice");
+
+// The load-bearing one: deleting the admin must not re-open the door, or
+// anyone who ever controls that mailbox owns the platform.
+await asService();
+await db.exec(`delete from public.user_roles where role = 'admin'`);
+const stillShut = await one(`select public.bootstrap_available() a`);
+check(
+  stillShut.a === false,
+  "removing the admin does not re-open the bootstrap — the ticket stays burned",
+);
+
+// Put the admin back for anything downstream.
+await db.exec(`insert into public.user_roles (user_id, role) values ('${sneaky.id}', 'admin')`);
+
 console.log(
   `\n${"=".repeat(52)}\n${failures === 0 ? "ALL CHECKS PASSED" : failures + " CHECK(S) FAILED"}\n${"=".repeat(52)}`,
 );

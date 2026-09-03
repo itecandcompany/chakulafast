@@ -535,6 +535,15 @@ export type Database = {
         Args: { lat1: number; lng1: number; lat2: number; lng2: number };
         Returns: number;
       };
+      bootstrap_available: {
+        Args: Record<PropertyKey, never>;
+        Returns: boolean;
+      };
+      bootstrap_admin: {
+        Args: Record<PropertyKey, never>;
+        /** The claimed email, or an error: BOOTSTRAP_CLOSED / _NOT_ELIGIBLE. */
+        Returns: string;
+      };
       check_kitchen_slot: {
         Args: { _restaurant: string; _prep_minutes: number; _arrival_minutes: number };
         Returns: {

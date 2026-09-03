@@ -24,7 +24,7 @@ const authSearchSchema = z.object({
   mode: z.enum(["signin", "signup"]).optional().catch(undefined),
   // An allow-list rather than a free string: this value is fed straight to
   // navigate() after sign-in, and an arbitrary one would be an open redirect.
-  redirect: z.enum(["/cart", "/orders", "/account"]).optional().catch(undefined),
+  redirect: z.enum(["/cart", "/orders", "/account", "/bootstrap"]).optional().catch(undefined),
 });
 
 export const Route = createFileRoute("/auth")({

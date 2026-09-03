@@ -73,6 +73,28 @@ exercises the parts no type checker can see — that a customer can't rewrite a
 price, that a restaurant can't publish itself without paying, that the status
 pipeline only moves one step at a time. No Docker, no network, ~15 seconds.
 
+### 3a. Claim the first admin without the service-role key
+
+`handle_new_user()` refuses `role=admin` from signup metadata and `user_roles`
+has no INSERT policy, so normally only `seed:admin` can mint an administrator.
+That leaves a new deployment stuck: restaurants can register and pay, but
+nobody can confirm the payment, so no listing goes live.
+
+`/bootstrap` opens that door exactly once. Sign up normally with the email in
+`platform_settings.bootstrap_admin_email`, then visit `/bootstrap` and claim
+it. Three things must hold, all re-checked in SQL:
+
+1. the platform has **no** admin yet;
+2. you are signed in, claiming **your own** account (the email is read from
+   `auth.users`, never taken as an argument);
+3. your email matches the seeded claim.
+
+On success the claim is set to NULL, so the door stays shut even if the admin
+row is later deleted. Every admin after the first is granted from the console.
+
+To point it at a different email before you deploy, edit the `UPDATE` in
+`supabase/migrations/20260902110000_bootstrap_admin.sql`.
+
 ### 3. Seed an admin and demo data
 
 ```bash
