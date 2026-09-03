@@ -92,6 +92,9 @@ const en = {
   "search.title": "Results for “{query}”",
   "search.titleEmpty": "Browse food near you",
   "search.count": "{count} dishes",
+  "empty.noRestaurantsYet": "No restaurants are listed yet",
+  "empty.noRestaurantsYetHint":
+    "ChakulaFast is new here. As soon as kitchens in your area register, their dishes appear in search straight away — nothing is wrong with your search.",
   "search.noResults": "No kitchen near you has that right now.",
   "search.noResultsHint": "Try a different spelling, a wider distance, or another area.",
   "search.widen": "Widen search to {km} km",
@@ -329,6 +332,9 @@ const sw: Record<TKey, string> = {
   "search.title": "Matokeo ya “{query}”",
   "search.titleEmpty": "Vinjari chakula kilicho karibu nawe",
   "search.count": "Vyakula {count}",
+  "empty.noRestaurantsYet": "Bado hakuna migahawa iliyoorodheshwa",
+  "empty.noRestaurantsYetHint":
+    "ChakulaFast ni mpya hapa. Mara migahawa ya eneo lako itakapojisajili, vyakula vyao vitaonekana kwenye utafutaji mara moja — hakuna hitilafu kwenye utafutaji wako.",
   "search.noResults": "Hakuna jiko lililo karibu lenye chakula hicho kwa sasa.",
   "search.noResultsHint": "Jaribu tahajia nyingine, umbali mkubwa zaidi, au eneo lingine.",
   "search.widen": "Panua utafutaji hadi km {km}",

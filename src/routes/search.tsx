@@ -321,7 +321,20 @@ function SearchPage() {
                 <Skeleton key={i} className="h-[126px] w-full rounded-2xl" />
               ))}
 
-            {results?.length === 0 && (
+            {/* active_towns() is empty only when the platform has no listed
+                restaurant anywhere — a different situation from "your filters
+                matched nothing", and telling a customer to loosen filters that
+                were never the problem just makes the app look broken. */}
+            {results?.length === 0 && towns.length === 0 && (
+              <div className="rounded-2xl border border-dashed p-8 text-center">
+                <p className="font-medium">{t("empty.noRestaurantsYet")}</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {t("empty.noRestaurantsYetHint")}
+                </p>
+              </div>
+            )}
+
+            {results?.length === 0 && towns.length > 0 && (
               <div className="rounded-2xl border border-dashed p-8 text-center">
                 <p className="font-medium">{t("search.noResults")}</p>
                 <p className="mt-1 text-sm text-muted-foreground">{t("search.noResultsHint")}</p>

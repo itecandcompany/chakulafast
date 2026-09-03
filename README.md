@@ -137,6 +137,35 @@ walks in                →   status: ready                       →   food is 
 That subtraction is the whole product. Everything else — search, filters,
 payments, the admin console — exists to make it possible.
 
+### When the kitchen can't take any more
+
+That subtraction assumes the kitchen is free to start cooking at the moment it
+computes. During a rush it isn't, and a promise made on a full line is exactly
+how food ends up late.
+
+So a restaurant can declare `kitchen_capacity` — how many orders may be cooking
+at once. An order occupies the kitchen for the span
+`[arrival − prep, arrival]`, two orders contend when those spans overlap, and
+once capacity is reached checkout offers the next workable time instead of
+adding to the pile:
+
+```
+Kitchen capacity 3, all three already cooking at 13:00
+
+customer asks for 13:00   →   check_kitchen_slot()  →  full, earliest 13:20
+                              "They can have it hot at 13:20"  [ Arrive 13:20 ]
+```
+
+`check_kitchen_slot()` is advice for the checkout screen; a trigger on
+`orders` is the rule, so two customers taking the last slot at the same instant
+can't both win. Capacity `0` — the default — means unlimited, so nothing
+changes for a restaurant that never sets it.
+
+This is the pattern commercial kitchen display systems call _order throttling_.
+The arrival half of the problem (knowing the customer is close) is what
+Chick-fil-A and McDonald's "Ready on Arrival" solve with geofencing, and what
+`order_pings` does here.
+
 ---
 
 ## Architecture

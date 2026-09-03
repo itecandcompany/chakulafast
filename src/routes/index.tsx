@@ -199,9 +199,19 @@ function Landing() {
               [0, 1, 2].map((i) => <Skeleton key={i} className="h-24 w-full rounded-2xl" />)}
 
             {nearby?.length === 0 && (
-              <p className="rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">
-                {t("landing.nearbyEmpty")}
-              </p>
+              <div className="rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+                {/* Same distinction as the search page: an empty platform is
+                    not an empty neighbourhood, and saying so keeps a new
+                    launch from reading as a broken app. */}
+                {towns.length === 0 ? (
+                  <>
+                    <p className="font-medium text-foreground">{t("empty.noRestaurantsYet")}</p>
+                    <p className="mt-1">{t("empty.noRestaurantsYetHint")}</p>
+                  </>
+                ) : (
+                  <p>{t("landing.nearbyEmpty")}</p>
+                )}
+              </div>
             )}
 
             {nearby?.map((r) => (
