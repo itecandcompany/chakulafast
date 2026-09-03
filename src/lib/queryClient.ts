@@ -43,7 +43,14 @@ export const qk = {
   vendorPayments: (restaurantId: string) => ["payments", "vendor", restaurantId] as const,
   vendorInsights: (restaurantId: string, days: number) => ["insights", restaurantId, days] as const,
   adminSummary: () => ["admin", "summary"] as const,
-  adminPayments: () => ["admin", "payments"] as const,
+  // Filters are part of the key so every page/search combination caches
+  // separately and the back-and-forth between pages is instant.
+  adminUsers: (f: unknown) => ["admin", "users", f] as const,
+  adminOrders: (f: unknown) => ["admin", "orders", f] as const,
+  adminRestaurants: (f: unknown) => ["admin", "restaurants", f] as const,
+  adminPayments: (f?: unknown) => ["admin", "payments", f ?? null] as const,
+  platformSettings: () => ["admin", "settings"] as const,
+  adminAudit: (page: number) => ["admin", "audit", page] as const,
   restaurant: (slug: string) => ["restaurant", slug] as const,
   dishSearch: (filters: unknown, origin: unknown) => ["search", filters, origin] as const,
   nearby: (origin: unknown, town: string | null) => ["nearby", origin, town] as const,

@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { RefreshCw, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,8 +13,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { supabase } from "@/integrations/supabase/client";
 import { toUserMessage } from "@/lib/errorMessages";
+import { fetchAdminOrders, type AdminOrderRow } from "@/lib/queries/adminTables";
+import { qk } from "@/lib/queryClient";
+import { useDebounced } from "@/hooks/useDebounced";
+import Paginator from "@/components/admin/Paginator";
 import { formatTsh } from "@/lib/geo";
 import { formatClock } from "@/lib/hours";
 import {
@@ -25,58 +29,31 @@ import {
 
 export const Route = createFileRoute("/admin/orders")({ component: AdminOrders });
 
-type AdminOrder = {
-  id: string;
-  code: string;
-  status: OrderStatus;
-  total: number;
-  prep_minutes: number;
-  expected_arrival_at: string;
-  created_at: string;
-  cancel_reason: string | null;
-  restaurants: { name: string; town: string } | null;
-  order_items: { id: string; name: string; qty: number }[];
-};
+type AdminOrder = AdminOrderRow;
 
 function AdminOrders() {
-  const [orders, setOrders] = useState<AdminOrder[] | null>(null);
+  const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | OrderStatus>("all");
+  const [page, setPage] = useState(0);
 
-  const load = useCallback(async () => {
-    const { data, error } = await supabase
-      .from("orders")
-      .select(
-        `id, code, status, total, prep_minutes, expected_arrival_at, created_at, cancel_reason,
-         restaurants ( name, town ),
-         order_items ( id, name, qty )`,
-      )
-      .order("created_at", { ascending: false })
-      .limit(200);
-
-    if (error) {
-      toast.error(toUserMessage(error, "Couldn't load orders."));
-      setOrders([]);
-      return;
-    }
-    setOrders((data ?? []) as unknown as AdminOrder[]);
-  }, []);
+  const debouncedQuery = useDebounced(query);
+  const filters = { query: debouncedQuery, status: statusFilter, page };
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    setPage(0);
+  }, [debouncedQuery, statusFilter]);
 
-  const filtered = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return (orders ?? []).filter((order) => {
-      if (statusFilter !== "all" && order.status !== statusFilter) return false;
-      if (!needle) return true;
-      return (
-        order.code.toLowerCase().includes(needle) ||
-        (order.restaurants?.name ?? "").toLowerCase().includes(needle)
-      );
-    });
-  }, [orders, query, statusFilter]);
+  const { data, isPending, isFetching, error } = useQuery({
+    queryKey: qk.adminOrders(filters),
+    queryFn: () => fetchAdminOrders(filters),
+    placeholderData: (prev) => prev,
+  });
+
+  const orders: AdminOrder[] = data?.rows ?? [];
+  const total = data?.total ?? 0;
+
+  const load = () => queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
@@ -84,7 +61,9 @@ function AdminOrders() {
         <div>
           <h1 className="font-display text-xl font-bold">Orders</h1>
           <p className="text-sm text-muted-foreground">
-            Most recent 200 orders across every restaurant.
+            {isPending
+              ? "Loading…"
+              : `${total} ${total === 1 ? "order" : "orders"} across every restaurant`}
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={load}>
@@ -99,7 +78,7 @@ function AdminOrders() {
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by order code or restaurant"
+            placeholder="Search by order code"
             className="pl-9"
           />
         </div>
@@ -121,7 +100,13 @@ function AdminOrders() {
         </Select>
       </div>
 
-      {orders === null && (
+      {error && (
+        <p className="rounded-xl bg-destructive/10 p-3 text-sm text-destructive">
+          {toUserMessage(error, "Couldn't load orders.")}
+        </p>
+      )}
+
+      {isPending && (
         <div className="space-y-2">
           {[0, 1, 2].map((i) => (
             <Skeleton key={i} className="h-20 w-full rounded-2xl" />
@@ -129,14 +114,14 @@ function AdminOrders() {
         </div>
       )}
 
-      {orders !== null && filtered.length === 0 && (
+      {!isPending && orders.length === 0 && (
         <p className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">
           No orders match those filters.
         </p>
       )}
 
       <div className="space-y-2">
-        {filtered.map((order) => (
+        {orders.map((order) => (
           <div
             key={order.id}
             className="flex flex-wrap items-center gap-3 rounded-2xl border bg-card p-3 shadow-card"
@@ -173,6 +158,16 @@ function AdminOrders() {
           </div>
         ))}
       </div>
+
+      {!isPending && (
+        <Paginator
+          page={page}
+          total={total}
+          rows={orders.length}
+          onPage={setPage}
+          busy={isFetching}
+        />
+      )}
     </div>
   );
 }

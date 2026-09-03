@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { RefreshCw, Search, ShieldOff, ShieldCheck, User as UserIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,10 +13,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toUserMessage } from "@/lib/errorMessages";
 import { adminSetUserRole, adminSetUserSuspended } from "@/lib/adminUsers.functions";
+import { fetchAdminUsers } from "@/lib/queries/adminTables";
+import { qk } from "@/lib/queryClient";
+import { useDebounced } from "@/hooks/useDebounced";
+import Paginator from "@/components/admin/Paginator";
 import type { AppRole } from "@/lib/auth";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -31,29 +35,33 @@ const ROLE_LABEL: Record<AppRole, string> = {
 
 function AdminUsers() {
   const { user } = useAuth();
-  const [profiles, setProfiles] = useState<Profile[] | null>(null);
+  const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<"all" | AppRole>("all");
+  const [page, setPage] = useState(0);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(500);
+  // Searching happens in Postgres now, so the raw keystrokes can't drive the
+  // query key without a round trip per character.
+  const debouncedQuery = useDebounced(query);
+  const filters = { query: debouncedQuery, role: roleFilter, page };
 
-    if (error) {
-      toast.error(toUserMessage(error, "Couldn't load users."));
-      setProfiles([]);
-      return;
-    }
-    setProfiles(data ?? []);
-  }, []);
-
+  // Changing a filter while on page 4 would otherwise ask for the fifth page
+  // of a result set that may only have one.
   useEffect(() => {
-    void load();
-  }, [load]);
+    setPage(0);
+  }, [debouncedQuery, roleFilter]);
+
+  const { data, isPending, isFetching, error } = useQuery({
+    queryKey: qk.adminUsers(filters),
+    queryFn: () => fetchAdminUsers(filters),
+    placeholderData: (prev) => prev,
+  });
+
+  const profiles = data?.rows ?? [];
+  const total = data?.total ?? 0;
+
+  const load = () => queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
 
   const changeRole = async (profile: Profile, role: AppRole) => {
     setBusyId(profile.id);
@@ -83,26 +91,13 @@ function AdminUsers() {
     }
   };
 
-  const filtered = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return (profiles ?? []).filter((p) => {
-      if (roleFilter !== "all" && p.role !== roleFilter) return false;
-      if (!needle) return true;
-      return (
-        p.full_name.toLowerCase().includes(needle) ||
-        (p.phone ?? "").toLowerCase().includes(needle) ||
-        (p.town ?? "").toLowerCase().includes(needle)
-      );
-    });
-  }, [profiles, query, roleFilter]);
-
   return (
     <div className="mx-auto max-w-5xl space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="font-display text-xl font-bold">Users</h1>
           <p className="text-sm text-muted-foreground">
-            {profiles ? `${profiles.length} accounts` : "Loading…"}
+            {isPending ? "Loading…" : `${total} ${total === 1 ? "account" : "accounts"}`}
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={load}>
@@ -134,7 +129,13 @@ function AdminUsers() {
         </Select>
       </div>
 
-      {profiles === null && (
+      {error && (
+        <p className="rounded-xl bg-destructive/10 p-3 text-sm text-destructive">
+          {toUserMessage(error, "Couldn't load users.")}
+        </p>
+      )}
+
+      {isPending && (
         <div className="space-y-2">
           {[0, 1, 2].map((i) => (
             <Skeleton key={i} className="h-16 w-full rounded-2xl" />
@@ -142,14 +143,14 @@ function AdminUsers() {
         </div>
       )}
 
-      {profiles !== null && filtered.length === 0 && (
+      {!isPending && profiles.length === 0 && (
         <p className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">
           No users match those filters.
         </p>
       )}
 
       <div className="space-y-2">
-        {filtered.map((profile) => {
+        {profiles.map((profile) => {
           const isSelf = profile.id === user?.id;
           return (
             <div
@@ -222,6 +223,16 @@ function AdminUsers() {
           );
         })}
       </div>
+
+      {!isPending && (
+        <Paginator
+          page={page}
+          total={total}
+          rows={profiles.length}
+          onPage={setPage}
+          busy={isFetching}
+        />
+      )}
     </div>
   );
 }

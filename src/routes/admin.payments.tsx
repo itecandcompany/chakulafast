@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Check, RefreshCw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,6 +8,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { toUserMessage } from "@/lib/errorMessages";
+import { fetchAdminPayments, type AdminPaymentRow } from "@/lib/queries/adminTables";
+import { qk } from "@/lib/queryClient";
+import Paginator from "@/components/admin/Paginator";
 import { formatTsh } from "@/lib/geo";
 import { adminConfirmPayment, adminRejectPayment } from "@/lib/adminRestaurants.functions";
 import ReceivedPaymentsPanel from "@/components/admin/ReceivedPaymentsPanel";
@@ -16,32 +20,32 @@ import type { Database } from "@/integrations/supabase/types";
 
 export const Route = createFileRoute("/admin/payments")({ component: AdminPayments });
 
-type Payment = Database["public"]["Tables"]["registration_payments"]["Row"] & {
-  restaurants: { id: string; name: string; town: string; status: string } | null;
-};
+type Payment = AdminPaymentRow;
 
 function AdminPayments() {
-  const [payments, setPayments] = useState<Payment[] | null>(null);
+  const queryClient = useQueryClient();
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [pendingPage, setPendingPage] = useState(0);
+  const [settledPage, setSettledPage] = useState(0);
 
-  const load = useCallback(async () => {
-    const { data, error } = await supabase
-      .from("registration_payments")
-      .select("*, restaurants ( id, name, town, status )")
-      .order("created_at", { ascending: false })
-      .limit(200);
+  const load = () => queryClient.invalidateQueries({ queryKey: ["admin", "payments"] });
 
-    if (error) {
-      toast.error(toUserMessage(error, "Couldn't load payments."));
-      setPayments([]);
-      return;
-    }
-    setPayments((data ?? []) as unknown as Payment[]);
-  }, []);
+  // Two queries rather than one list split in the browser: the queue a human
+  // works through stays short, while the settled history only ever grows, so
+  // they page independently.
+  const pendingQuery = useQuery({
+    queryKey: qk.adminPayments({ tab: "pending", page: pendingPage }),
+    queryFn: () => fetchAdminPayments({ statuses: ["submitted", "pending"], page: pendingPage }),
+    placeholderData: (prev) => prev,
+  });
+
+  const settledQuery = useQuery({
+    queryKey: qk.adminPayments({ tab: "settled", page: settledPage }),
+    queryFn: () => fetchAdminPayments({ statuses: ["confirmed", "failed"], page: settledPage }),
+    placeholderData: (prev) => prev,
+  });
 
   useEffect(() => {
-    void load();
-
     // A vendor submitting a reference should appear here without a refresh —
     // the whole point of this screen is that somebody is waiting on it.
     const channel = supabase
@@ -49,14 +53,16 @@ function AdminPayments() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "registration_payments" },
-        () => void load(),
+        () => void queryClient.invalidateQueries({ queryKey: ["admin", "payments"] }),
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [load]);
+    // `load` is recreated every render; the client itself is stable, so this
+    // subscribes once instead of tearing down and re-subscribing constantly.
+  }, [queryClient]);
 
   const confirm = async (payment: Payment) => {
     setBusyId(payment.id);
@@ -94,8 +100,10 @@ function AdminPayments() {
     }
   };
 
-  const pending = payments?.filter((p) => p.status === "submitted" || p.status === "pending") ?? [];
-  const settled = payments?.filter((p) => p.status === "confirmed" || p.status === "failed") ?? [];
+  const pending = pendingQuery.data?.rows ?? [];
+  const settled = settledQuery.data?.rows ?? [];
+  const pendingTotal = pendingQuery.data?.total ?? 0;
+  const settledTotal = settledQuery.data?.total ?? 0;
 
   const renderRow = (payment: Payment, actionable: boolean) => (
     <div
@@ -179,21 +187,30 @@ function AdminPayments() {
       <Tabs defaultValue="pending">
         <TabsList className="w-full">
           <TabsTrigger value="pending" className="flex-1">
-            To verify ({pending.length})
+            To verify ({pendingTotal})
           </TabsTrigger>
           <TabsTrigger value="settled" className="flex-1">
-            Settled ({settled.length})
+            Settled ({settledTotal})
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="pending" className="space-y-2 pt-4">
-          {payments === null && <Skeleton className="h-24 w-full rounded-2xl" />}
-          {payments !== null && pending.length === 0 && (
+          {pendingQuery.isPending && <Skeleton className="h-24 w-full rounded-2xl" />}
+          {!pendingQuery.isPending && pending.length === 0 && (
             <p className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">
               Nothing waiting. Every restaurant that has paid is live.
             </p>
           )}
           {pending.map((payment) => renderRow(payment, true))}
+          {!pendingQuery.isPending && (
+            <Paginator
+              page={pendingPage}
+              total={pendingTotal}
+              rows={pending.length}
+              onPage={setPendingPage}
+              busy={pendingQuery.isFetching}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="settled" className="space-y-2 pt-4">
@@ -203,6 +220,15 @@ function AdminPayments() {
             </p>
           )}
           {settled.map((payment) => renderRow(payment, false))}
+          {!settledQuery.isPending && (
+            <Paginator
+              page={settledPage}
+              total={settledTotal}
+              rows={settled.length}
+              onPage={setSettledPage}
+              busy={settledQuery.isFetching}
+            />
+          )}
         </TabsContent>
       </Tabs>
     </div>

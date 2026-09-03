@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ExternalLink, MapPin, RefreshCw, Search, Trash2, UtensilsCrossed } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toUserMessage } from "@/lib/errorMessages";
+import { fetchAdminRestaurants } from "@/lib/queries/adminTables";
+import { qk } from "@/lib/queryClient";
+import { useDebounced } from "@/hooks/useDebounced";
+import Paginator from "@/components/admin/Paginator";
 import { adminDeleteRestaurant, adminSetRestaurantStatus } from "@/lib/adminRestaurants.functions";
 import {
   RESTAURANT_STATUS_COLORS,
@@ -39,29 +44,30 @@ type Restaurant = Database["public"]["Tables"]["restaurants"]["Row"];
 const STATUS_FILTERS = ["all", "pending_payment", "active", "suspended", "rejected"] as const;
 
 function AdminRestaurants() {
-  const [restaurants, setRestaurants] = useState<Restaurant[] | null>(null);
+  const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<(typeof STATUS_FILTERS)[number]>("all");
+  const [page, setPage] = useState(0);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<Restaurant | null>(null);
 
-  const load = useCallback(async () => {
-    const { data, error } = await supabase
-      .from("restaurants")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      toast.error(toUserMessage(error, "Couldn't load restaurants."));
-      setRestaurants([]);
-      return;
-    }
-    setRestaurants(data ?? []);
-  }, []);
+  const debouncedQuery = useDebounced(query);
+  const filters = { query: debouncedQuery, status: statusFilter, page };
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    setPage(0);
+  }, [debouncedQuery, statusFilter]);
+
+  const { data, isPending, isFetching, error } = useQuery({
+    queryKey: qk.adminRestaurants(filters),
+    queryFn: () => fetchAdminRestaurants(filters),
+    placeholderData: (prev) => prev,
+  });
+
+  const restaurants = data?.rows ?? [];
+  const total = data?.total ?? 0;
+
+  const load = () => queryClient.invalidateQueries({ queryKey: ["admin", "restaurants"] });
 
   const setStatus = async (restaurant: Restaurant, status: RestaurantStatus) => {
     const reason =
@@ -100,26 +106,13 @@ function AdminRestaurants() {
     }
   };
 
-  const filtered = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return (restaurants ?? []).filter((r) => {
-      if (statusFilter !== "all" && r.status !== statusFilter) return false;
-      if (!needle) return true;
-      return (
-        r.name.toLowerCase().includes(needle) ||
-        r.town.toLowerCase().includes(needle) ||
-        r.address.toLowerCase().includes(needle)
-      );
-    });
-  }, [restaurants, query, statusFilter]);
-
   return (
     <div className="mx-auto max-w-5xl space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-display text-xl font-bold">Restaurants</h1>
           <p className="text-sm text-muted-foreground">
-            {restaurants ? `${restaurants.length} registered` : "Loading…"}
+            {isPending ? "Loading…" : `${total} registered`}
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={load}>
@@ -155,7 +148,13 @@ function AdminRestaurants() {
         </Select>
       </div>
 
-      {restaurants === null && (
+      {error && (
+        <p className="rounded-xl bg-destructive/10 p-3 text-sm text-destructive">
+          {toUserMessage(error, "Couldn't load restaurants.")}
+        </p>
+      )}
+
+      {isPending && (
         <div className="space-y-2">
           {[0, 1, 2].map((i) => (
             <Skeleton key={i} className="h-24 w-full rounded-2xl" />
@@ -163,14 +162,14 @@ function AdminRestaurants() {
         </div>
       )}
 
-      {restaurants !== null && filtered.length === 0 && (
+      {!isPending && restaurants.length === 0 && (
         <p className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">
           No restaurants match those filters.
         </p>
       )}
 
       <div className="space-y-2">
-        {filtered.map((restaurant) => (
+        {restaurants.map((restaurant) => (
           <div
             key={restaurant.id}
             className="flex flex-wrap items-center gap-3 rounded-2xl border bg-card p-3 shadow-card"
@@ -252,6 +251,16 @@ function AdminRestaurants() {
           </div>
         ))}
       </div>
+
+      {!isPending && (
+        <Paginator
+          page={page}
+          total={total}
+          rows={restaurants.length}
+          onPage={setPage}
+          busy={isFetching}
+        />
+      )}
 
       <AlertDialog open={deleting !== null} onOpenChange={(open) => !open && setDeleting(null)}>
         <AlertDialogContent>
