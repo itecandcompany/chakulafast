@@ -392,6 +392,19 @@ in a Supabase Edge Function so the API key never reaches the browser.
 
 ## Deployment
 
+`vercel.json` installs with **`npm ci`, not `npm install`** — and that line is
+load-bearing. npm re-resolves peer ranges on `install`, and
+`@lovable.dev/vite-tanstack-config` asks for `peerOptional nitro >=3.0.260603-beta`.
+Under semver a range carrying a prerelease tag only matches prereleases of that
+same version tuple, so the pinned `nitro@3.0.260610-beta` is judged not to
+satisfy it and the install exits `ERESOLVE` before the build starts. `npm ci`
+installs the lockfile verbatim and never re-resolves.
+
+Note also that Vercel validates `vercel.json` with `additionalProperties: false`.
+There is no way to leave a comment in that file — an extra `_note` key makes the
+whole config invalid and the deploy fails before it starts. Explanations go here
+instead.
+
 Push to a Git repo and import it into Vercel. The nitro `vercel` preset in
 `vite.config.ts` emits `.vercel/output`, which Vercel picks up automatically —
 don't set an `outputDirectory`.

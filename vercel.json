@@ -1,7 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "npm run build",
-  "_installCommand": "`npm ci`, not `npm install`. npm re-resolves peer ranges on install, and @lovable.dev/vite-tanstack-config asks for peerOptional nitro >=3.0.260603-beta. Under semver, a range carrying a prerelease tag only matches prereleases of that same version tuple, so the nitro 3.0.260610-beta this project pins is judged NOT to satisfy it and every clean install dies with ERESOLVE. ci installs the lockfile verbatim and never re-resolves, which is what a deploy wants anyway: the build ships exactly what was tested.",
   "installCommand": "npm ci",
   "framework": null,
   "headers": [
