@@ -813,9 +813,20 @@ await db.exec(`update public.restaurants set kitchen_capacity = 0 where id = '${
 console.log("\n=== first-admin bootstrap ===");
 
 await asService();
+// Read the claim the migration seeded rather than repeating the address here.
+// Hard-coding it would let the test keep passing against an email the
+// migration no longer uses — the one failure this section must never have.
+const seededClaim = (
+  await one(`select bootstrap_admin_email e from public.platform_settings where id`)
+).e;
+check(
+  typeof seededClaim === "string" && seededClaim.includes("@"),
+  `the migration seeds a bootstrap claim (${seededClaim})`,
+);
+
 // The claimant's mailbox. Set first so the "already owned" case below is
 // testing the admin-exists guard and nothing else.
-await db.exec(`update auth.users set email = 'gene@admin.com' where id = '${sneaky.id}'`);
+await db.exec(`update auth.users set email = '${seededClaim}' where id = '${sneaky.id}'`);
 
 // Set up the closed case explicitly instead of relying on whatever roles
 // earlier sections happened to leave behind — a guard this load-bearing
@@ -842,7 +853,7 @@ check(closedForReal, "and the function itself refuses while the platform has an 
 await asService();
 await db.exec(`delete from public.user_roles where role = 'admin'`);
 await db.exec(
-  `update public.platform_settings set bootstrap_admin_email = 'gene@admin.com' where id`,
+  `update public.platform_settings set bootstrap_admin_email = '${seededClaim}' where id`,
 );
 const bootstrapOpen = await one(`select public.bootstrap_available() a`);
 check(bootstrapOpen.a === true, "with no admin and an unused claim, bootstrap is available");
@@ -865,8 +876,8 @@ check(
 // The real claimant.
 const claimed = await as("authenticated", sneaky.id, `select public.bootstrap_admin() v`);
 check(
-  claimed.rows[0].v === "gene@admin.com",
-  `the named account claims the admin seat (${claimed.rows[0].v})`,
+  claimed.rows[0].v === seededClaim,
+  `the seeded account claims the admin seat (${claimed.rows[0].v})`,
 );
 
 await asService();

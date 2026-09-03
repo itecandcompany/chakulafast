@@ -30,7 +30,7 @@ COMMENT ON COLUMN public.platform_settings.bootstrap_admin_email IS
 -- ticket that is worthless the moment either the ticket or the admin seat is
 -- taken, and worthless to anyone who cannot sign in to that mailbox.
 UPDATE public.platform_settings
-   SET bootstrap_admin_email = 'gene@admin.com'
+   SET bootstrap_admin_email = 'genesisfukuru@icloud.com'
  WHERE id;
 
 CREATE OR REPLACE FUNCTION public.bootstrap_admin()
