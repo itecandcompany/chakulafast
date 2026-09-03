@@ -69,6 +69,12 @@ const en = {
   "landing.usingLocation": "Using your location",
   "landing.locating": "Finding you…",
   "landing.locationDenied": "Location unavailable — pick your area instead.",
+  "loc.denied":
+    "Location permission was blocked. Allow it in your browser settings, or pick your area below.",
+  "loc.timeout": "Couldn't get a location fix — pick your area below instead.",
+  "loc.unavailable": "Your device couldn't provide a location. Pick your area below.",
+  "loc.unsupported": "This browser doesn't support location. Pick your area below.",
+  "loc.insecure": "Location only works over a secure (https) connection. Pick your area below.",
   "landing.howItWorks": "How it works",
   "landing.step1": "Search a dish",
   "landing.step1Body": "Type what you're craving and see every kitchen nearby that has it.",
@@ -79,6 +85,15 @@ const en = {
   "landing.nearbyTitle": "Kitchens around you",
   "landing.nearbyEmpty": "No restaurants listed in this area yet.",
   "landing.viewMenu": "View menu",
+  "upcoming.title": "Coming soon",
+  "upcoming.subtitle": "Being built now. Everything below is planned, not promised.",
+  "upcoming.badge": "Coming soon",
+  "upcoming.mobileMoney": "Register by M-Pesa, Tigo Pesa or Airtel Money",
+  "upcoming.mobileMoneyBody":
+    "Restaurants pay the 5,000 TSh registration fee in cash today. Mobile money is next: a payment that reconciles will publish the listing on its own, at any hour.",
+  "upcoming.sms": "A text message when your food is ready",
+  "upcoming.smsBody":
+    "Alerts already reach you while the app is open. SMS, for when it isn't, is next.",
   "landing.vendorCta": "Own a restaurant or hotel?",
   "landing.vendorCtaBody": "List your kitchen and start taking pre-orders.",
   "landing.vendorCtaButton": "Register your restaurant",
@@ -86,11 +101,15 @@ const en = {
   "search.title": "Results for “{query}”",
   "search.titleEmpty": "Browse food near you",
   "search.count": "{count} dishes",
+  "empty.noRestaurantsYet": "No restaurants are listed yet",
+  "empty.noRestaurantsYetHint":
+    "ChakulaFast is new here. As soon as kitchens in your area register, their dishes appear in search straight away — nothing is wrong with your search.",
   "search.noResults": "No kitchen near you has that right now.",
   "search.noResultsHint": "Try a different spelling, a wider distance, or another area.",
   "search.widen": "Widen search to {km} km",
   "search.clearFilters": "Clear filters",
   "search.placeholder": "Search a dish…",
+  "search.didYouMean": "Did you mean",
 
   "filter.sort": "Sort",
   "filter.sortDistance": "Nearest first",
@@ -141,6 +160,11 @@ const en = {
   "cart.phoneHint": "So the kitchen can reach you if something is unclear.",
   "cart.place": "Place pre-order",
   "cart.placing": "Sending…",
+  "cart.kitchenFull": "{name} is fully booked for that time.",
+  "cart.kitchenFullHint": "Their kitchen can have it hot for you at {time}.",
+  "cart.kitchenFullNoSlot":
+    "They have no free slot in the next few hours. Try another restaurant, or come back later.",
+  "cart.kitchenFullAccept": "Arrive at {time} instead",
   "cart.switchRestaurant": "Start a new basket?",
   "cart.switchRestaurantBody":
     "Your basket has food from {current}. Adding this dish will clear it and start a new order at {next}.",
@@ -182,6 +206,8 @@ const en = {
   "order.eta": "You're about {count} min away",
   "order.rate": "Rate this order",
   "order.reorder": "Order again",
+  "order.reorderGone": "Nothing from that order is on the menu right now.",
+  "order.reorderPartial": "{count} item(s) were unavailable and left out.",
   "order.items": "{count} items",
 
   "status.pending": "Sent to kitchen",
@@ -233,7 +259,7 @@ const en = {
   "auth.checkEmail": "Check your email to confirm your account, then sign in.",
   "auth.vendorFeeNotice":
     "Listing your restaurant costs a one-time {fee} registration fee. You'll pay it after creating your account.",
-  "auth.passwordHint": "At least 8 characters.",
+  "auth.passwordHint": "At least 8 characters, with a letter and a number.",
   "auth.browseAsGuest": "Browse without an account",
 
   "install.title": "Install ChakulaFast",
@@ -290,6 +316,13 @@ const sw: Record<TKey, string> = {
   "landing.usingLocation": "Inatumia mahali ulipo",
   "landing.locating": "Inatafuta ulipo…",
   "landing.locationDenied": "Mahali hapapatikani — chagua eneo lako badala yake.",
+  "loc.denied":
+    "Ruhusa ya mahali imezuiwa. Iruhusu kwenye mipangilio ya kivinjari, au chagua eneo lako hapa chini.",
+  "loc.timeout": "Imeshindikana kupata mahali ulipo — chagua eneo lako hapa chini.",
+  "loc.unavailable": "Kifaa chako hakikuweza kutoa mahali. Chagua eneo lako hapa chini.",
+  "loc.unsupported": "Kivinjari hiki hakiruhusu mahali. Chagua eneo lako hapa chini.",
+  "loc.insecure":
+    "Mahali hufanya kazi kwa muunganisho salama (https) tu. Chagua eneo lako hapa chini.",
   "landing.howItWorks": "Inavyofanya kazi",
   "landing.step1": "Tafuta chakula",
   "landing.step1Body": "Andika unachotamani uone kila jiko lililo karibu lenye chakula hicho.",
@@ -301,6 +334,15 @@ const sw: Record<TKey, string> = {
   "landing.nearbyTitle": "Majiko yaliyo karibu nawe",
   "landing.nearbyEmpty": "Bado hakuna mgahawa uliosajiliwa katika eneo hili.",
   "landing.viewMenu": "Ona menyu",
+  "upcoming.title": "Yanakuja hivi karibuni",
+  "upcoming.subtitle": "Yanaendelea kutengenezwa. Yaliyo hapa chini yamepangwa, si ahadi.",
+  "upcoming.badge": "Inakuja",
+  "upcoming.mobileMoney": "Jisajili kwa M-Pesa, Tigo Pesa au Airtel Money",
+  "upcoming.mobileMoneyBody":
+    "Kwa sasa migahawa hulipa ada ya usajili ya TSh 5,000 kwa fedha taslimu. Malipo ya simu yanafuata: malipo yanayolingana yataweka tangazo hewani yenyewe, saa yoyote.",
+  "upcoming.sms": "Ujumbe wa simu chakula kikiwa tayari",
+  "upcoming.smsBody":
+    "Tayari unapata taarifa ukiwa kwenye app. SMS, kwa wakati usiokuwepo, inafuata.",
   "landing.vendorCta": "Una mgahawa au hoteli?",
   "landing.vendorCtaBody": "Sajili jiko lako uanze kupokea oda za mapema.",
   "landing.vendorCtaButton": "Sajili mgahawa wako",
@@ -308,11 +350,15 @@ const sw: Record<TKey, string> = {
   "search.title": "Matokeo ya “{query}”",
   "search.titleEmpty": "Vinjari chakula kilicho karibu nawe",
   "search.count": "Vyakula {count}",
+  "empty.noRestaurantsYet": "Bado hakuna migahawa iliyoorodheshwa",
+  "empty.noRestaurantsYetHint":
+    "ChakulaFast ni mpya hapa. Mara migahawa ya eneo lako itakapojisajili, vyakula vyao vitaonekana kwenye utafutaji mara moja — hakuna hitilafu kwenye utafutaji wako.",
   "search.noResults": "Hakuna jiko lililo karibu lenye chakula hicho kwa sasa.",
   "search.noResultsHint": "Jaribu tahajia nyingine, umbali mkubwa zaidi, au eneo lingine.",
   "search.widen": "Panua utafutaji hadi km {km}",
   "search.clearFilters": "Ondoa vichujio",
   "search.placeholder": "Tafuta chakula…",
+  "search.didYouMean": "Ulimaanisha",
 
   "filter.sort": "Panga",
   "filter.sortDistance": "Karibu zaidi kwanza",
@@ -363,6 +409,11 @@ const sw: Record<TKey, string> = {
   "cart.phoneHint": "Ili jiko liweze kukupata endapo kuna jambo halijaeleweka.",
   "cart.place": "Tuma oda ya mapema",
   "cart.placing": "Inatuma…",
+  "cart.kitchenFull": "{name} wamejaa kwa muda huo.",
+  "cart.kitchenFullHint": "Jiko lao linaweza kukuandalia chakula cha moto saa {time}.",
+  "cart.kitchenFullNoSlot":
+    "Hawana nafasi kwa saa chache zijazo. Jaribu mgahawa mwingine, au rudi baadaye.",
+  "cart.kitchenFullAccept": "Fika saa {time} badala yake",
   "cart.switchRestaurant": "Anza kikapu kipya?",
   "cart.switchRestaurantBody":
     "Kikapu chako kina chakula cha {current}. Ukiongeza chakula hiki kitafutwa na kuanza oda mpya {next}.",
@@ -404,6 +455,8 @@ const sw: Record<TKey, string> = {
   "order.eta": "Umebaki takriban dakika {count}",
   "order.rate": "Toa maoni kuhusu oda hii",
   "order.reorder": "Agiza tena",
+  "order.reorderGone": "Hakuna chochote cha oda hiyo kinachopatikana sasa.",
+  "order.reorderPartial": "Vitu {count} havikupatikana na vimeachwa.",
   "order.items": "Vitu {count}",
 
   "status.pending": "Imetumwa jikoni",
@@ -455,7 +508,7 @@ const sw: Record<TKey, string> = {
   "auth.checkEmail": "Angalia barua pepe yako kuthibitisha akaunti, kisha ingia.",
   "auth.vendorFeeNotice":
     "Kusajili mgahawa wako kunagharimu ada ya usajili ya mara moja ya {fee}. Utailipa baada ya kufungua akaunti.",
-  "auth.passwordHint": "Angalau herufi 8.",
+  "auth.passwordHint": "Angalau herufi 8, zikiwa na herufi na tarakimu.",
   "auth.browseAsGuest": "Vinjari bila akaunti",
 
   "install.title": "Sakinisha ChakulaFast",

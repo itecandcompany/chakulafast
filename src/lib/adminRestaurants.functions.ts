@@ -2,7 +2,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { enforceEmailConfirmed } from "@/lib/auth.server";
 import type { Database } from "@/integrations/supabase/types";
+import { enforceRateLimit } from "@/lib/rateLimit";
 
 // Admin-only listing and payment moderation. These run server-side so they
 // can use the service-role client (client.server.ts) — never expose that key
@@ -44,8 +46,9 @@ async function requireAdmin(context: { supabase: SupabaseClient<Database>; userI
  */
 export const adminSetRestaurantStatus = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => statusSchema.parse(input))
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, enforceEmailConfirmed])
   .handler(async ({ data, context }) => {
+    enforceRateLimit("admin-restaurant-status", context.userId, { windowMs: 60_000, max: 30 });
     await requireAdmin(context);
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -74,8 +77,9 @@ export const adminSetRestaurantStatus = createServerFn({ method: "POST" })
  */
 export const adminConfirmPayment = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => paymentSchema.parse(input))
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, enforceEmailConfirmed])
   .handler(async ({ data, context }) => {
+    enforceRateLimit("admin-payment-confirm", context.userId, { windowMs: 60_000, max: 30 });
     await requireAdmin(context);
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -111,8 +115,9 @@ export const adminConfirmPayment = createServerFn({ method: "POST" })
 
 export const adminRejectPayment = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => paymentSchema.parse(input))
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, enforceEmailConfirmed])
   .handler(async ({ data, context }) => {
+    enforceRateLimit("admin-payment-reject", context.userId, { windowMs: 60_000, max: 30 });
     await requireAdmin(context);
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -151,8 +156,9 @@ export const adminRejectPayment = createServerFn({ method: "POST" })
  */
 export const adminDeleteRestaurant = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => deleteSchema.parse(input))
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, enforceEmailConfirmed])
   .handler(async ({ data, context }) => {
+    enforceRateLimit("admin-restaurant-delete", context.userId, { windowMs: 60_000, max: 30 });
     await requireAdmin(context);
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

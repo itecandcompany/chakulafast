@@ -2,7 +2,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { enforceEmailConfirmed } from "@/lib/auth.server";
 import type { Database } from "@/integrations/supabase/types";
+import { enforceRateLimit } from "@/lib/rateLimit";
 
 // Admin-only user management actions. These run server-side so they can use
 // the service-role client (client.server.ts) — never expose that key to the
@@ -50,8 +52,9 @@ async function isAdmin(supabaseAdmin: SupabaseClient<Database>, userId: string) 
 
 export const adminSetUserRole = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => roleSchema.parse(input))
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, enforceEmailConfirmed])
   .handler(async ({ data, context }) => {
+    enforceRateLimit("admin-role", context.userId, { windowMs: 60_000, max: 20 });
     await requireAdmin(context);
 
     if (data.targetUserId === context.userId) {
@@ -100,8 +103,9 @@ export const adminSetUserRole = createServerFn({ method: "POST" })
 
 export const adminSetUserSuspended = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => suspendSchema.parse(input))
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, enforceEmailConfirmed])
   .handler(async ({ data, context }) => {
+    enforceRateLimit("admin-suspend", context.userId, { windowMs: 60_000, max: 20 });
     await requireAdmin(context);
 
     if (data.targetUserId === context.userId) {

@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { ClipboardList, CreditCard, Home, Store, UtensilsCrossed } from "lucide-react";
+import { BarChart3, ClipboardList, CreditCard, Home, Store, UtensilsCrossed } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -14,6 +14,7 @@ import type { RestaurantStatus } from "@/lib/restaurantStatus";
 
 const ITEMS = [
   { label: "Orders", url: "/vendor", icon: ClipboardList, exact: true },
+  { label: "Insights", url: "/vendor/insights", icon: BarChart3 },
   { label: "Menu", url: "/vendor/menu", icon: UtensilsCrossed },
   { label: "Restaurant", url: "/vendor/profile", icon: Store },
   { label: "Billing", url: "/vendor/billing", icon: CreditCard },

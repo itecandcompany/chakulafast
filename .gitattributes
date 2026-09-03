@@ -1,2 +1,7 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# Normalise to LF in the repository AND in the working tree on every platform.
+#
+# `text=auto` alone leaves Windows checkouts as CRLF (core.autocrlf=true),
+# which Prettier then rejects on every single line — thousands of phantom
+# "Delete ␍" errors after any branch switch. `eol=lf` pins the working tree to
+# match what Prettier writes, so the two stop fighting.
+* text=auto eol=lf

@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Clock, MapPin, Navigation, Star, XCircle } from "lucide-react";
+import { Clock, MapPin, Navigation, RotateCcw, Star, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -27,6 +27,7 @@ import {
   STATUS_LABEL_KEY,
   type OrderStatus,
 } from "@/lib/orderStatus";
+import { useCart } from "@/lib/cart";
 import { useArrivalSharing } from "@/hooks/useArrivalSharing";
 import { useNow } from "@/hooks/useNow";
 
@@ -47,8 +48,15 @@ export type CustomerOrder = {
     lat: number;
     lng: number;
     address: string;
+    town: string;
   } | null;
-  order_items: { id: string; name: string; qty: number; line_total: number }[];
+  order_items: {
+    id: string;
+    name: string;
+    qty: number;
+    line_total: number;
+    menu_item_id: string | null;
+  }[];
   reviews: { id: string }[];
 };
 
@@ -66,6 +74,10 @@ export default function CustomerOrderCard({
   const [sharing, setSharing] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [reordering, setReordering] = useState(false);
+  const navigate = useNavigate();
+  const clearCart = useCart((s) => s.clear);
+  const addToCart = useCart((s) => s.add);
 
   const destination = order.restaurants
     ? { lat: order.restaurants.lat, lng: order.restaurants.lng }
@@ -79,6 +91,76 @@ export default function CustomerOrderCard({
 
   const live = isLive(order.status);
   const minutesLeft = minutesUntilArrival(order.expected_arrival_at, now);
+
+  /**
+   * Rebuild this order in the basket.
+   *
+   * Prices and availability are re-read from the live menu rather than reused
+   * from the order's snapshots: a dish may have gone up, gone out of stock or
+   * been taken off the menu since. Reusing the old price would only be
+   * overwritten by prepare_order_item() at checkout anyway, so the customer
+   * would see the number change under them at the worst possible moment.
+   */
+  const reorder = async () => {
+    if (!order.restaurants) return;
+    setReordering(true);
+    try {
+      const ids = order.order_items
+        .map((i) => i.menu_item_id)
+        .filter((id): id is string => id !== null);
+
+      if (ids.length === 0) {
+        toast.error(t("order.reorderGone"));
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("menu_items")
+        .select("id, name, price, prep_minutes, photo_url, is_available")
+        .in("id", ids);
+      if (error) throw error;
+
+      // Named `available`, not `live` — the outer `live` means "order is in
+      // progress" and shadowing it here would be a trap for the next reader.
+      const available = (data ?? []).filter((m) => m.is_available);
+      if (available.length === 0) {
+        toast.error(t("order.reorderGone"));
+        return;
+      }
+
+      clearCart();
+      for (const item of available) {
+        const qty = order.order_items.find((i) => i.menu_item_id === item.id)?.qty ?? 1;
+        addToCart(
+          {
+            id: order.restaurants.id,
+            name: order.restaurants.name,
+            slug: order.restaurants.slug,
+            lat: order.restaurants.lat,
+            lng: order.restaurants.lng,
+            address: order.restaurants.address,
+            town: order.restaurants.town,
+          },
+          {
+            menuItemId: item.id,
+            name: item.name,
+            unitPrice: Number(item.price),
+            prepMinutes: item.prep_minutes,
+            photoUrl: item.photo_url,
+          },
+          qty,
+        );
+      }
+
+      const missing = ids.length - available.length;
+      if (missing > 0) toast.warning(t("order.reorderPartial", { count: missing }));
+      navigate({ to: "/cart" });
+    } catch (err) {
+      toast.error(toUserMessage(err, t("common.somethingWrong")));
+    } finally {
+      setReordering(false);
+    }
+  };
 
   const cancel = async () => {
     setCancelling(true);
@@ -224,11 +306,26 @@ export default function CustomerOrderCard({
         </div>
       )}
 
-      {order.status === "completed" && order.reviews.length === 0 && (
-        <Button variant="outline" size="sm" className="h-9" onClick={() => onReview(order)}>
-          <Star className="h-3.5 w-3.5" />
-          {t("order.rate")}
-        </Button>
+      {!live && order.restaurants && (
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9"
+            onClick={reorder}
+            disabled={reordering}
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            {t("order.reorder")}
+          </Button>
+
+          {order.status === "completed" && order.reviews.length === 0 && (
+            <Button variant="ghost" size="sm" className="h-9" onClick={() => onReview(order)}>
+              <Star className="h-3.5 w-3.5" />
+              {t("order.rate")}
+            </Button>
+          )}
+        </div>
       )}
 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>

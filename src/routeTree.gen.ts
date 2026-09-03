@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as BootstrapRouteImport } from './routes/bootstrap'
 import { Route as CartRouteImport } from './routes/cart'
 import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as PrivacyRouteImport } from './routes/privacy'
@@ -26,6 +27,7 @@ import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as RSlugRouteImport } from './routes/r.$slug'
 import { Route as VendorIndexRouteImport } from './routes/vendor.index'
 import { Route as VendorBillingRouteImport } from './routes/vendor.billing'
+import { Route as VendorInsightsRouteImport } from './routes/vendor.insights'
 import { Route as VendorMenuRouteImport } from './routes/vendor.menu'
 import { Route as VendorProfileRouteImport } from './routes/vendor.profile'
 import { Route as VendorSetupRouteImport } from './routes/vendor.setup'
@@ -48,6 +50,11 @@ const AdminRoute = AdminRouteImport.update({
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BootstrapRoute = BootstrapRouteImport.update({
+  id: '/bootstrap',
+  path: '/bootstrap',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CartRoute = CartRouteImport.update({
@@ -115,6 +122,11 @@ const VendorBillingRoute = VendorBillingRouteImport.update({
   path: '/billing',
   getParentRoute: () => VendorRoute,
 } as any)
+const VendorInsightsRoute = VendorInsightsRouteImport.update({
+  id: '/insights',
+  path: '/insights',
+  getParentRoute: () => VendorRoute,
+} as any)
 const VendorMenuRoute = VendorMenuRouteImport.update({
   id: '/menu',
   path: '/menu',
@@ -136,6 +148,7 @@ export interface FileRoutesByFullPath {
   '/account': typeof AccountRoute
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
+  '/bootstrap': typeof BootstrapRoute
   '/cart': typeof CartRoute
   '/orders': typeof OrdersRoute
   '/privacy': typeof PrivacyRoute
@@ -147,6 +160,7 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof AdminUsersRoute
   '/r/$slug': typeof RSlugRoute
   '/vendor/billing': typeof VendorBillingRoute
+  '/vendor/insights': typeof VendorInsightsRoute
   '/vendor/menu': typeof VendorMenuRoute
   '/vendor/profile': typeof VendorProfileRoute
   '/vendor/setup': typeof VendorSetupRoute
@@ -157,6 +171,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
   '/auth': typeof AuthRoute
+  '/bootstrap': typeof BootstrapRoute
   '/cart': typeof CartRoute
   '/orders': typeof OrdersRoute
   '/privacy': typeof PrivacyRoute
@@ -167,6 +182,7 @@ export interface FileRoutesByTo {
   '/admin/users': typeof AdminUsersRoute
   '/r/$slug': typeof RSlugRoute
   '/vendor/billing': typeof VendorBillingRoute
+  '/vendor/insights': typeof VendorInsightsRoute
   '/vendor/menu': typeof VendorMenuRoute
   '/vendor/profile': typeof VendorProfileRoute
   '/vendor/setup': typeof VendorSetupRoute
@@ -179,6 +195,7 @@ export interface FileRoutesById {
   '/account': typeof AccountRoute
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
+  '/bootstrap': typeof BootstrapRoute
   '/cart': typeof CartRoute
   '/orders': typeof OrdersRoute
   '/privacy': typeof PrivacyRoute
@@ -190,6 +207,7 @@ export interface FileRoutesById {
   '/admin/users': typeof AdminUsersRoute
   '/r/$slug': typeof RSlugRoute
   '/vendor/billing': typeof VendorBillingRoute
+  '/vendor/insights': typeof VendorInsightsRoute
   '/vendor/menu': typeof VendorMenuRoute
   '/vendor/profile': typeof VendorProfileRoute
   '/vendor/setup': typeof VendorSetupRoute
@@ -203,6 +221,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/admin'
     | '/auth'
+    | '/bootstrap'
     | '/cart'
     | '/orders'
     | '/privacy'
@@ -214,6 +233,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/r/$slug'
     | '/vendor/billing'
+    | '/vendor/insights'
     | '/vendor/menu'
     | '/vendor/profile'
     | '/vendor/setup'
@@ -224,6 +244,7 @@ export interface FileRouteTypes {
     | '/'
     | '/account'
     | '/auth'
+    | '/bootstrap'
     | '/cart'
     | '/orders'
     | '/privacy'
@@ -234,6 +255,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/r/$slug'
     | '/vendor/billing'
+    | '/vendor/insights'
     | '/vendor/menu'
     | '/vendor/profile'
     | '/vendor/setup'
@@ -245,6 +267,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/admin'
     | '/auth'
+    | '/bootstrap'
     | '/cart'
     | '/orders'
     | '/privacy'
@@ -256,6 +279,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/r/$slug'
     | '/vendor/billing'
+    | '/vendor/insights'
     | '/vendor/menu'
     | '/vendor/profile'
     | '/vendor/setup'
@@ -268,6 +292,7 @@ export interface RootRouteChildren {
   AccountRoute: typeof AccountRoute
   AdminRoute: typeof AdminRouteWithChildren
   AuthRoute: typeof AuthRoute
+  BootstrapRoute: typeof BootstrapRoute
   CartRoute: typeof CartRoute
   OrdersRoute: typeof OrdersRoute
   PrivacyRoute: typeof PrivacyRoute
@@ -304,6 +329,13 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bootstrap': {
+      id: '/bootstrap'
+      path: '/bootstrap'
+      fullPath: '/bootstrap'
+      preLoaderRoute: typeof BootstrapRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/cart': {
@@ -397,6 +429,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VendorBillingRouteImport
       parentRoute: typeof VendorRoute
     }
+    '/vendor/insights': {
+      id: '/vendor/insights'
+      path: '/insights'
+      fullPath: '/vendor/insights'
+      preLoaderRoute: typeof VendorInsightsRouteImport
+      parentRoute: typeof VendorRoute
+    }
     '/vendor/menu': {
       id: '/vendor/menu'
       path: '/menu'
@@ -441,6 +480,7 @@ const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 interface VendorRouteChildren {
   VendorBillingRoute: typeof VendorBillingRoute
+  VendorInsightsRoute: typeof VendorInsightsRoute
   VendorMenuRoute: typeof VendorMenuRoute
   VendorProfileRoute: typeof VendorProfileRoute
   VendorSetupRoute: typeof VendorSetupRoute
@@ -449,6 +489,7 @@ interface VendorRouteChildren {
 
 const VendorRouteChildren: VendorRouteChildren = {
   VendorBillingRoute: VendorBillingRoute,
+  VendorInsightsRoute: VendorInsightsRoute,
   VendorMenuRoute: VendorMenuRoute,
   VendorProfileRoute: VendorProfileRoute,
   VendorSetupRoute: VendorSetupRoute,
@@ -463,6 +504,7 @@ const rootRouteChildren: RootRouteChildren = {
   AccountRoute: AccountRoute,
   AdminRoute: AdminRouteWithChildren,
   AuthRoute: AuthRoute,
+  BootstrapRoute: BootstrapRoute,
   CartRoute: CartRoute,
   OrdersRoute: OrdersRoute,
   PrivacyRoute: PrivacyRoute,

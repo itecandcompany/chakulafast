@@ -16,6 +16,11 @@ export default tseslint.config(
       // ESLint chews through the entire generated/bundled JS output and
       // reports prettier noise against code nobody wrote by hand.
       ".vercel",
+      // Agent git worktrees live inside the project, so each one is a second
+      // full checkout of the repo. Linting them means every file is reported
+      // twice, and any worktree on another branch drags in its own unrelated
+      // findings — 16k phantom errors from code that isn't this checkout's.
+      ".claude/worktrees",
       "src/integrations/supabase/types.ts",
       "src/routeTree.gen.ts",
     ],
@@ -33,6 +38,16 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
+      // `allowConstantExport` is what lets TanStack Router's mandatory
+      // `export const Route = createFileRoute(...)` sit alongside the route's
+      // component without every route file warning.
+      //
+      // Do NOT add `allowExportNames: ["Route"]` here: it looks like the more
+      // precise option, but it reclassifies the file as having no component
+      // export and the rule then fires on all 21 routes instead. Related:
+      // eslint-plugin-react-refresh is held at ^0.4 in package.json — 0.5
+      // flags this same framework pattern no matter how the rule is
+      // configured.
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "@typescript-eslint/no-unused-vars": "off",
     },

@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { enforceEmailConfirmed } from "@/lib/auth.server";
 import { enforceRateLimit } from "@/lib/rateLimit";
 import { getPaymentProvider } from "@/lib/payments";
 import type { PaymentMethod } from "@/lib/payments";
@@ -25,7 +26,7 @@ const submitSchema = z.object({
  * non-VITE_ env var, so the browser can't read it directly.
  */
 export const getBillingContext = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, enforceEmailConfirmed])
   .handler(async ({ context }) => {
     const { data: settings } = await context.supabase
       .from("platform_settings")
@@ -50,7 +51,7 @@ export const getBillingContext = createServerFn({ method: "GET" })
 
 export const submitRegistrationPayment = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => submitSchema.parse(input))
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, enforceEmailConfirmed])
   .handler(async ({ data, context }) => {
     enforceRateLimit("registration-payment", context.userId, { windowMs: 60_000, max: 10 });
 
@@ -80,9 +81,18 @@ export const submitRegistrationPayment = createServerFn({ method: "POST" })
       throw new Response("That payment method isn't available right now.", { status: 400 });
     }
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // Everything below runs as the vendor, not as the service role.
+    //
+    // It used to use supabaseAdmin, which meant this endpoint — and so the
+    // entire registration flow — was dead on any deployment without
+    // SUPABASE_SERVICE_ROLE_KEY set. It never needed those privileges: RLS
+    // already scopes registration_payments to the restaurant's owner, and the
+    // ownership check above is that same policy doing the work. Dropping to
+    // the caller's own client removes the dependency and narrows what a bug
+    // in here could reach.
+    const db = context.supabase;
 
-    const { data: confirmed } = await supabaseAdmin
+    const { data: confirmed } = await db
       .from("registration_payments")
       .select("id")
       .eq("restaurant_id", restaurant.id)
@@ -99,7 +109,7 @@ export const submitRegistrationPayment = createServerFn({ method: "POST" })
     // Reuse an open attempt rather than piling up rows every time the vendor
     // corrects a mistyped reference — the partial unique index only covers
     // confirmed rows, so nothing else would stop the pile-up.
-    const { data: open } = await supabaseAdmin
+    const { data: open } = await db
       .from("registration_payments")
       .select("id")
       .eq("restaurant_id", restaurant.id)
@@ -113,7 +123,7 @@ export const submitRegistrationPayment = createServerFn({ method: "POST" })
     if (!paymentId) {
       // amount and currency are overwritten by prepare_registration_payment()
       // from platform_settings; the values here are only placeholders.
-      const { data: created, error: insertError } = await supabaseAdmin
+      const { data: created, error: insertError } = await db
         .from("registration_payments")
         .insert({
           restaurant_id: restaurant.id,
@@ -129,7 +139,7 @@ export const submitRegistrationPayment = createServerFn({ method: "POST" })
       if (insertError || !created) throw new Error("Unable to record your payment");
       paymentId = created.id;
     } else {
-      const { error: updateError } = await supabaseAdmin
+      const { error: updateError } = await db
         .from("registration_payments")
         .update({
           method: data.method,
@@ -143,7 +153,7 @@ export const submitRegistrationPayment = createServerFn({ method: "POST" })
       if (updateError) throw new Error("Unable to record your payment");
     }
 
-    const { data: payment } = await supabaseAdmin
+    const { data: payment } = await db
       .from("registration_payments")
       .select("amount, currency")
       .eq("id", paymentId)
@@ -162,6 +172,11 @@ export const submitRegistrationPayment = createServerFn({ method: "POST" })
     // A provider that settles synchronously confirms the row here; the
     // activate_restaurant_on_payment() trigger publishes the listing.
     if (result.kind === "confirmed") {
+      // A vendor must never be able to confirm their own payment, so this one
+      // genuinely needs the service role — and it is imported here, inside the
+      // branch, so a deployment with no gateway (and no service-role key) can
+      // still run the manual flow above.
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { error } = await supabaseAdmin
         .from("registration_payments")
         .update({
@@ -183,6 +198,7 @@ export const submitRegistrationPayment = createServerFn({ method: "POST" })
     }
 
     if (result.kind === "push_sent") {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       await supabaseAdmin
         .from("registration_payments")
         .update({ provider_payload: { providerRef: result.providerRef } })

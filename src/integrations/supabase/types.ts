@@ -302,6 +302,45 @@ export type Database = {
         };
         Relationships: [];
       };
+      received_payments: {
+        Row: {
+          id: string;
+          reference: string;
+          /** Generated: reference upper-cased with punctuation stripped. */
+          reference_key: string;
+          amount: number;
+          currency: string;
+          msisdn: string | null;
+          paid_at: string | null;
+          source: string;
+          claimed_by: string | null;
+          claimed_at: string | null;
+          recorded_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          reference: string;
+          amount: number;
+          currency?: string;
+          msisdn?: string | null;
+          paid_at?: string | null;
+          source?: string;
+          recorded_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          reference?: string;
+          amount?: number;
+          currency?: string;
+          msisdn?: string | null;
+          paid_at?: string | null;
+          source?: string;
+          claimed_by?: string | null;
+          claimed_at?: string | null;
+        };
+        Relationships: [];
+      };
       registration_payments: {
         Row: {
           amount: number;
@@ -398,6 +437,7 @@ export type Database = {
           description: string | null;
           id: string;
           is_accepting_orders: boolean;
+          kitchen_capacity: number;
           lat: number;
           lng: number;
           logo_url: string | null;
@@ -419,6 +459,7 @@ export type Database = {
           description?: string | null;
           id?: string;
           is_accepting_orders?: boolean;
+          kitchen_capacity?: number;
           lat: number;
           lng: number;
           logo_url?: string | null;
@@ -435,6 +476,7 @@ export type Database = {
           cover_url?: string | null;
           description?: string | null;
           is_accepting_orders?: boolean;
+          kitchen_capacity?: number;
           lat?: number;
           lng?: number;
           logo_url?: string | null;
@@ -532,6 +574,25 @@ export type Database = {
         Args: { lat1: number; lng1: number; lat2: number; lng2: number };
         Returns: number;
       };
+      bootstrap_available: {
+        Args: Record<PropertyKey, never>;
+        Returns: boolean;
+      };
+      bootstrap_admin: {
+        Args: Record<PropertyKey, never>;
+        /** The claimed email, or an error: BOOTSTRAP_CLOSED / _NOT_ELIGIBLE. */
+        Returns: string;
+      };
+      check_kitchen_slot: {
+        Args: { _restaurant: string; _prep_minutes: number; _arrival_minutes: number };
+        Returns: {
+          available: boolean;
+          capacity: number;
+          busy: number;
+          /** Minutes from now, not a timestamp — the unit the customer picked. */
+          suggested_minutes: number | null;
+        }[];
+      };
       is_restaurant_open: {
         Args: { _restaurant_id: string; _at?: string };
         Returns: boolean;
@@ -617,7 +678,53 @@ export type Database = {
           is_accepting_orders: boolean;
           is_open: boolean;
           distance_km: number | null;
+          is_fuzzy_match: boolean;
         }[];
+      };
+      admin_summary: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          total_users: number;
+          total_restaurants: number;
+          active_restaurants: number;
+          awaiting_payment: number;
+          payments_to_verify: number;
+          total_orders: number;
+          live_orders: number;
+          completed_orders: number;
+          fee_revenue: number;
+          order_volume: number;
+        }[];
+      };
+      vendor_summary: {
+        Args: { _restaurant_id: string; _days?: number };
+        Returns: {
+          orders_total: number;
+          orders_completed: number;
+          orders_cancelled: number;
+          takings: number;
+          average_order: number;
+          ready_on_time_pct: number | null;
+          median_prep_minutes: number | null;
+          rating: number;
+          rating_count: number;
+        }[];
+      };
+      vendor_daily: {
+        Args: { _restaurant_id: string; _days?: number };
+        Returns: { day: string; orders: number; takings: number }[];
+      };
+      vendor_top_dishes: {
+        Args: { _restaurant_id: string; _days?: number; _limit?: number };
+        Returns: { name: string; qty: number; takings: number }[];
+      };
+      vendor_busiest_hours: {
+        Args: { _restaurant_id: string; _days?: number };
+        Returns: { hour: number; orders: number }[];
+      };
+      suggest_dish: {
+        Args: { _q: string };
+        Returns: string | null;
       };
     };
     Enums: {

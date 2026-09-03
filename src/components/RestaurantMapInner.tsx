@@ -1,4 +1,8 @@
 import { useEffect, useMemo, useRef } from "react";
+// Self-hosted rather than pulled from unpkg: it keeps the CSP to one fewer
+// origin, removes a third-party script host from the critical path, and
+// means the map still styles correctly if that CDN is blocked or down.
+import "leaflet/dist/leaflet.css";
 import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import { Link } from "@tanstack/react-router";

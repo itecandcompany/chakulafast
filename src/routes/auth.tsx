@@ -24,7 +24,7 @@ const authSearchSchema = z.object({
   mode: z.enum(["signin", "signup"]).optional().catch(undefined),
   // An allow-list rather than a free string: this value is fed straight to
   // navigate() after sign-in, and an arbitrary one would be an open redirect.
-  redirect: z.enum(["/cart", "/orders", "/account"]).optional().catch(undefined),
+  redirect: z.enum(["/cart", "/orders", "/account", "/bootstrap"]).optional().catch(undefined),
 });
 
 export const Route = createFileRoute("/auth")({
@@ -35,6 +35,30 @@ export const Route = createFileRoute("/auth")({
 
 const GOOGLE_ENABLED = import.meta.env.VITE_ENABLE_GOOGLE_AUTH === "true";
 const REGISTRATION_FEE = Number(import.meta.env.VITE_REGISTRATION_FEE_TZS ?? 5000);
+
+/**
+ * Password rules, checked before the request leaves.
+ *
+ * `minLength={8}` on the input is an HTML attribute — devtools, a script or a
+ * non-browser client bypasses it trivially, so it is a hint to the user rather
+ * than a rule. This is the rule.
+ *
+ * It is still not the *last* line of defence: Supabase Auth enforces its own
+ * minimum server-side, and leaked-password protection has to be switched on in
+ * the dashboard (see the launch checklist in README). What this does is fail
+ * fast and explain why, instead of round-tripping to get a generic rejection.
+ */
+function passwordProblem(password: string): string | null {
+  if (password.length < 8) return "Use at least 8 characters.";
+  if (!/[a-zA-Z]/.test(password)) return "Include at least one letter.";
+  if (!/[0-9]/.test(password)) return "Include at least one number.";
+  // Catches the handful that a dictionary attack tries first. Real coverage
+  // comes from the dashboard's HaveIBeenPwned check.
+  if (/^(password|12345678|qwerty|letmein|welcome)/i.test(password)) {
+    return "That password is too easy to guess.";
+  }
+  return null;
+}
 
 function AuthPage() {
   const t = useT();
@@ -70,6 +94,12 @@ function AuthPage() {
 
     try {
       if (mode === "signup") {
+        const problem = passwordProblem(password);
+        if (problem) {
+          toast.error(problem);
+          return;
+        }
+
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password,

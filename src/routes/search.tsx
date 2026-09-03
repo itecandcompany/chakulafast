@@ -17,11 +17,13 @@ import {
   DEFAULT_FILTERS,
   isSortOption,
   searchDishes,
+  suggestDish,
   fetchActiveTowns,
   type DishResult,
   type SearchFilters,
 } from "@/lib/search";
 import { useDiscoveryLocation } from "@/hooks/useDiscoveryLocation";
+import { LOCATION_ERROR_KEY } from "@/lib/locationErrors";
 import { useAddToCart } from "@/hooks/useAddToCart";
 
 // Filters live in the URL so a result list can be shared, bookmarked and
@@ -38,11 +40,16 @@ const searchSchema = z.object({
   max: z.coerce.number().positive().optional().catch(undefined),
   // Not z.coerce.boolean() — that turns the string "false" into `true`,
   // because every non-empty string is truthy.
+  //
+  // `.optional()` has to come *after* `.transform()`: from zod 4 a transform
+  // applied to an optional produces a required key typed `boolean | undefined`,
+  // which makes every `<Link search={...}>` in the app demand an explicit
+  // `open`. Wrapping the transform keeps the key genuinely optional.
   open: z
     .union([z.boolean(), z.string()])
+    .transform((v) => (typeof v === "string" ? v === "true" : v))
     .optional()
-    .catch(undefined)
-    .transform((v) => (typeof v === "string" ? v === "true" : v)),
+    .catch(undefined),
 });
 
 export const Route = createFileRoute("/search")({
@@ -62,6 +69,7 @@ function SearchPage() {
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<"list" | "map">("list");
   const [towns, setTowns] = useState<string[]>([]);
+  const [correctedTo, setCorrectedTo] = useState<string | null>(null);
 
   // The URL is the single source of truth for the filter state; this just
   // reshapes it into the object the query and the filter bar both speak.
@@ -115,9 +123,27 @@ function SearchPage() {
     setResults(null);
     setError(null);
 
+    setCorrectedTo(null);
+
     searchDishes(filters, searchOrigin)
-      .then((rows) => {
-        if (!cancelled) setResults(rows);
+      .then(async (rows) => {
+        if (cancelled) return;
+        setResults(rows);
+
+        // Offer a correction only when every hit was approximate — if
+        // anything matched exactly, the spelling was fine and the fuzzy
+        // extras are a bonus rather than a substitution.
+        const allFuzzy = rows.length > 0 && rows.every((r) => r.is_fuzzy_match);
+        if (!allFuzzy || !filters.q.trim()) return;
+
+        const suggestion = await suggestDish(filters.q);
+        if (
+          !cancelled &&
+          suggestion &&
+          suggestion.toLowerCase() !== filters.q.trim().toLowerCase()
+        ) {
+          setCorrectedTo(suggestion);
+        }
       })
       .catch((err) => {
         if (cancelled) return;
@@ -214,6 +240,21 @@ function SearchPage() {
                 {!locationCtx.position && ` · ${locationCtx.town}`}
               </p>
             )}
+            {/* Only shown when *nothing* matched exactly. If some results are
+                real matches, correcting the spelling would be wrong — the
+                fuzzy extras are a bonus, not a substitution. */}
+            {correctedTo && (
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {t("search.didYouMean")}{" "}
+                <button
+                  type="button"
+                  onClick={() => applyFilters({ ...filters, q: correctedTo })}
+                  className="font-semibold text-primary hover:underline"
+                >
+                  {correctedTo}
+                </button>
+              </p>
+            )}
           </div>
 
           <div className="flex shrink-0 items-center gap-1 rounded-full border bg-muted p-1">
@@ -254,6 +295,12 @@ function SearchPage() {
           </button>
         )}
 
+        {locationCtx.locationError && (
+          <p className="mb-3 rounded-xl bg-muted p-3 text-xs text-muted-foreground">
+            {t(LOCATION_ERROR_KEY[locationCtx.locationError])}
+          </p>
+        )}
+
         {error && (
           <p className="mb-3 rounded-xl bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
         )}
@@ -274,7 +321,20 @@ function SearchPage() {
                 <Skeleton key={i} className="h-[126px] w-full rounded-2xl" />
               ))}
 
-            {results?.length === 0 && (
+            {/* active_towns() is empty only when the platform has no listed
+                restaurant anywhere — a different situation from "your filters
+                matched nothing", and telling a customer to loosen filters that
+                were never the problem just makes the app look broken. */}
+            {results?.length === 0 && towns.length === 0 && (
+              <div className="rounded-2xl border border-dashed p-8 text-center">
+                <p className="font-medium">{t("empty.noRestaurantsYet")}</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {t("empty.noRestaurantsYetHint")}
+                </p>
+              </div>
+            )}
+
+            {results?.length === 0 && towns.length > 0 && (
               <div className="rounded-2xl border border-dashed p-8 text-center">
                 <p className="font-medium">{t("search.noResults")}</p>
                 <p className="mt-1 text-sm text-muted-foreground">{t("search.noResultsHint")}</p>

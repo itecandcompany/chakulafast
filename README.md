@@ -62,6 +62,39 @@ No CLI? Open the SQL editor in the dashboard and run each file in
 `supabase/migrations/` **in filename order**. They're numbered by timestamp and
 must be applied in sequence.
 
+Either way, you can check the schema before it touches your project:
+
+```bash
+npm run test:db
+```
+
+That boots a real Postgres in WebAssembly, applies every migration, then
+exercises the parts no type checker can see — that a customer can't rewrite a
+price, that a restaurant can't publish itself without paying, that the status
+pipeline only moves one step at a time. No Docker, no network, ~15 seconds.
+
+### 3a. Claim the first admin without the service-role key
+
+`handle_new_user()` refuses `role=admin` from signup metadata and `user_roles`
+has no INSERT policy, so normally only `seed:admin` can mint an administrator.
+That leaves a new deployment stuck: restaurants can register and pay, but
+nobody can confirm the payment, so no listing goes live.
+
+`/bootstrap` opens that door exactly once. Sign up normally with the email in
+`platform_settings.bootstrap_admin_email`, then visit `/bootstrap` and claim
+it. Three things must hold, all re-checked in SQL:
+
+1. the platform has **no** admin yet;
+2. you are signed in, claiming **your own** account (the email is read from
+   `auth.users`, never taken as an argument);
+3. your email matches the seeded claim.
+
+On success the claim is set to NULL, so the door stays shut even if the admin
+row is later deleted. Every admin after the first is granted from the console.
+
+To point it at a different email before you deploy, edit the `UPDATE` in
+`supabase/migrations/20260902110000_bootstrap_admin.sql`.
+
 ### 3. Seed an admin and demo data
 
 ```bash
@@ -126,6 +159,35 @@ walks in                →   status: ready                       →   food is 
 That subtraction is the whole product. Everything else — search, filters,
 payments, the admin console — exists to make it possible.
 
+### When the kitchen can't take any more
+
+That subtraction assumes the kitchen is free to start cooking at the moment it
+computes. During a rush it isn't, and a promise made on a full line is exactly
+how food ends up late.
+
+So a restaurant can declare `kitchen_capacity` — how many orders may be cooking
+at once. An order occupies the kitchen for the span
+`[arrival − prep, arrival]`, two orders contend when those spans overlap, and
+once capacity is reached checkout offers the next workable time instead of
+adding to the pile:
+
+```
+Kitchen capacity 3, all three already cooking at 13:00
+
+customer asks for 13:00   →   check_kitchen_slot()  →  full, earliest 13:20
+                              "They can have it hot at 13:20"  [ Arrive 13:20 ]
+```
+
+`check_kitchen_slot()` is advice for the checkout screen; a trigger on
+`orders` is the rule, so two customers taking the last slot at the same instant
+can't both win. Capacity `0` — the default — means unlimited, so nothing
+changes for a restaurant that never sets it.
+
+This is the pattern commercial kitchen display systems call _order throttling_.
+The arrival half of the problem (knowing the customer is close) is what
+Chick-fil-A and McDonald's "Ready on Arrival" solve with geofencing, and what
+`order_pings` does here.
+
 ---
 
 ## Architecture
@@ -165,7 +227,7 @@ src/
 ├── integrations/supabase/      anon client · service-role client · middleware · types
 └── styles.css                  Tailwind v4 theme tokens
 supabase/migrations/            schema, RLS, triggers, RPCs
-scripts/                        seed-admin · seed-demo · gen:icons
+scripts/                        seed-admin · seed-demo · gen-icons · test-db
 ```
 
 ### Roles
@@ -243,6 +305,48 @@ Default flow (`PAYMENT_PROVIDER=manual`):
 Change the amount or the payment instructions in `platform_settings` — no
 migration needed.
 
+### Automatic activation when a reference reconciles — _not switched on_
+
+The registration fee is collected **in cash** today, so nothing auto-confirms:
+with no rows in `received_payments`, every payment waits for an admin exactly
+as it did before. The mechanism below is built, tested and idle, and the app
+says so — it is listed under "Coming soon" on the landing page, the billing
+page steers vendors to cash, and the admin panel is badged _Upcoming_.
+
+To switch it on, start recording payments in the ledger. Nothing else changes.
+
+### Automatic activation when a reference reconciles
+
+A human ticking off every registration is a person standing between a
+restaurant that has already paid and a listing that earns them money.
+
+The dangerous way to automate that is to accept any reference that _looks_
+like an M-Pesa transaction ID — that is guessing, not matching, and anyone who
+can type ten plausible characters gets a free listing. So matching here means
+matching against money the platform has actually observed arriving.
+
+`received_payments` is that ledger. Record each mobile-money payment in
+**Admin → Registration payments → Money received** (or point an SMS forwarder
+or provider webhook at the table). A vendor's reference is auto-confirmed only
+when it lines up with an **unclaimed** entry worth at least the fee:
+
+```
+vendor submits "qer 4t5-y7u"
+        │
+        ▼   normalised → QER4T5Y7U
+   received_payments row, unclaimed, amount >= fee ?
+        │                                  │
+       yes                                 no
+        │                                  │
+   claim the row                    stays 'submitted',
+   confirm the payment              waits for an admin
+   listing goes live                (exactly as before)
+```
+
+The ledger entry is marked spent on the registration that used it, so one
+payment can never activate two listings. Only admins can read the table —
+a vendor who could see unclaimed references would simply copy one.
+
 ### Plugging in M-Pesa / Tigo Pesa / Airtel Money
 
 `src/lib/payments/provider.ts` defines the whole contract. `manual.ts`
@@ -274,16 +378,17 @@ in a Supabase Edge Function so the API key never reaches the browser.
 
 ## Scripts
 
-| Command              | Does                                                        |
-| -------------------- | ----------------------------------------------------------- |
-| `npm run dev`        | Vite dev server on :5173                                    |
-| `npm run build`      | production build (nitro `vercel` preset → `.vercel/output`) |
-| `npm run typecheck`  | `tsc --noEmit`                                              |
-| `npm run lint`       | ESLint                                                      |
-| `npm run format`     | Prettier                                                    |
-| `npm run seed:admin` | create/promote an admin account                             |
-| `npm run seed:demo`  | five Moshi restaurants, menus, hours, a customer            |
-| `npm run gen:icons`  | regenerate the PWA icon set and OG image                    |
+| Command              | Does                                                               |
+| -------------------- | ------------------------------------------------------------------ |
+| `npm run dev`        | Vite dev server on :5173                                           |
+| `npm run build`      | production build (nitro `vercel` preset → `.vercel/output`)        |
+| `npm run typecheck`  | `tsc --noEmit`                                                     |
+| `npm run test:db`    | runs the migrations against a real Postgres and tests the triggers |
+| `npm run lint`       | ESLint                                                             |
+| `npm run format`     | Prettier                                                           |
+| `npm run seed:admin` | create/promote an admin account                                    |
+| `npm run seed:demo`  | five Moshi restaurants, menus, hours, a customer                   |
+| `npm run gen:icons`  | regenerate the PWA icon set and OG image                           |
 
 ## Deployment
 
@@ -299,6 +404,33 @@ Add your deployed URL to **Authentication → URL Configuration** in Supabase so
 email confirmation and OAuth redirect back correctly.
 
 ---
+
+## Launch checklist — Supabase dashboard
+
+The app enforces what it can in code: RLS on every table, guard triggers on
+every privileged column, server-side password rules, rate limits on every admin
+mutation, and `enforceEmailConfirmed` on every server function. The rest lives
+in the Supabase dashboard and **cannot be set from this repo**.
+
+Before taking real orders:
+
+| Setting                                   | Where                 | Why                                                                                                                                                                                        |
+| ----------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Custom SMTP**                           | Auth → Emails         | The default shared sender is rate-limited to a few messages an hour. This project already hit `over_email_send_rate_limit` during testing — on launch day it would block signups entirely. |
+| **Leaked-password protection**            | Auth → Policies       | Off by default. Checks new passwords against HaveIBeenPwned.                                                                                                                               |
+| **Minimum password length ≥ 8**           | Auth → Policies       | The client checks this too, but the client can be bypassed.                                                                                                                                |
+| **CAPTCHA on signup/signin**              | Auth → Bot protection | Without it, signup is an open endpoint that sends email.                                                                                                                                   |
+| **Shorter JWT expiry + refresh rotation** | Auth → Sessions       | Limits the damage from a stolen token.                                                                                                                                                     |
+| **MFA for admin accounts**                | Auth → MFA            | An admin can confirm payments and change roles.                                                                                                                                            |
+
+Also confirm after the first deploy:
+
+```bash
+curl -sI https://your-domain | grep -iE "content-security-policy|strict-transport"
+```
+
+Both headers are set in `vercel.json`. If the CSP blocks something, the browser
+console names the directive — do not widen it past the origin that failed.
 
 ## Known scope
 

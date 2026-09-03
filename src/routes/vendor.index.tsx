@@ -1,10 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Bell, BellOff, ClipboardList, Power, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import PrepQueue from "@/components/vendor/PrepQueue";
 import OrderTicket, { type VendorOrder } from "@/components/vendor/OrderTicket";
 import { supabase } from "@/integrations/supabase/client";
 import { toUserMessage } from "@/lib/errorMessages";
@@ -16,112 +18,127 @@ import {
   showNotification,
 } from "@/lib/notifications";
 import { useVendor } from "@/lib/vendorContext";
+import { fetchVendorOrders, patchCachedOrder } from "@/lib/queries/orders";
+import { qk } from "@/lib/queryClient";
 import { useNow } from "@/hooks/useNow";
 
 export const Route = createFileRoute("/vendor/")({ component: VendorOrders });
 
-const SELECT = `
-  id, code, status, total, prep_minutes, expected_arrival_at, created_at,
-  note, customer_phone, arrival_mode,
-  order_items ( id, name, qty, line_total ),
-  order_pings ( eta_minutes, distance_km, created_at )
-`;
-
-type RawOrder = Omit<VendorOrder, "latestPing"> & {
-  order_pings: { eta_minutes: number | null; distance_km: number | null; created_at: string }[];
-};
-
 function VendorOrders() {
   const { restaurant, refresh } = useVendor();
   const now = useNow(15_000);
+  const queryClient = useQueryClient();
+  const key = qk.vendorOrders(restaurant.id);
 
-  const [orders, setOrders] = useState<VendorOrder[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [alertsOn, setAlertsOn] = useState(false);
   const [togglingOpen, setTogglingOpen] = useState(false);
 
-  // Which orders we've already alerted on, so a refetch doesn't re-ring the
+  const {
+    data: orders,
+    error: queryError,
+    refetch,
+  } = useQuery({
+    queryKey: key,
+    queryFn: () => fetchVendorOrders(restaurant.id),
+  });
+
+  const error = queryError ? toUserMessage(queryError, "Couldn't load your orders.") : null;
+
+  // Which orders we've already alerted on, so a re-render doesn't re-ring the
   // bell for a ticket the kitchen has already seen.
   const announced = useRef<Set<string>>(new Set());
   const firstLoad = useRef(true);
 
-  const load = useCallback(async () => {
-    try {
-      const { data, error: queryError } = await supabase
-        .from("orders")
-        .select(SELECT)
-        .eq("restaurant_id", restaurant.id)
-        .order("expected_arrival_at", { ascending: true })
-        .limit(100);
+  // The chime is driven off the data rather than off the fetch, so it fires
+  // once per genuinely new ticket regardless of whether that ticket arrived
+  // via a refetch or a realtime patch.
+  useEffect(() => {
+    if (!orders) return;
 
-      if (queryError) throw queryError;
-
-      const rows = ((data ?? []) as unknown as RawOrder[]).map((row) => {
-        const pings = [...(row.order_pings ?? [])].sort((a, b) =>
-          b.created_at.localeCompare(a.created_at),
-        );
-        return { ...row, latestPing: pings[0] ?? null } as VendorOrder;
-      });
-
-      // Only announce new tickets after the first load — otherwise opening
-      // the dashboard would fire the chime once per order already in the
-      // queue, which is exactly the noise a busy kitchen tunes out.
-      if (!firstLoad.current) {
-        for (const order of rows) {
-          if (order.status === "pending" && !announced.current.has(order.id)) {
-            announced.current.add(order.id);
-            playAlertChime();
-            showNotification(
-              `New pre-order ${order.code}`,
-              `${order.order_items.length} item(s) · arrives ${new Date(
-                order.expected_arrival_at,
-              ).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
-              order.id,
-            );
-          }
-        }
-      } else {
-        for (const order of rows) announced.current.add(order.id);
-        firstLoad.current = false;
-      }
-
-      setOrders(rows);
-      setError(null);
-    } catch (err) {
-      setError(toUserMessage(err, "Couldn't load your orders."));
-      setOrders([]);
+    // Opening the dashboard must not fire the chime once per order already in
+    // the queue — that is exactly the noise a busy kitchen learns to ignore.
+    if (firstLoad.current) {
+      for (const order of orders) announced.current.add(order.id);
+      firstLoad.current = false;
+      return;
     }
-  }, [restaurant.id]);
+
+    for (const order of orders) {
+      if (order.status !== "pending" || announced.current.has(order.id)) continue;
+      announced.current.add(order.id);
+      playAlertChime();
+      showNotification(
+        `New pre-order ${order.code}`,
+        `${order.order_items.length} item(s) · arrives ${new Date(
+          order.expected_arrival_at,
+        ).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
+        order.id,
+      );
+    }
+  }, [orders]);
 
   useEffect(() => {
-    void load();
-
     // Two tables to watch: `orders` for status and new tickets, `order_pings`
     // for a customer's live arrival updates. RLS scopes both to this
-    // restaurant's own rows.
+    // restaurant's own rows, so nothing here can leak another kitchen's data.
+    //
+    // Neither handler refetches. A status change and a GPS ping each move one
+    // field on one row, and a kitchen with several customers en route sees a
+    // ping every few seconds — reloading a hundred orders and their joins each
+    // time was the single largest source of requests in the app.
     const channel = supabase
       .channel(`vendor-orders-${restaurant.id}`)
       .on(
         "postgres_changes",
         {
-          event: "*",
+          event: "UPDATE",
           schema: "public",
           table: "orders",
           filter: `restaurant_id=eq.${restaurant.id}`,
         },
-        () => void load(),
+        (payload) => {
+          const row = payload.new as { id: string };
+          // A row we don't hold means the list shape changed under us; only
+          // then is a refetch the right answer.
+          if (!patchCachedOrder(queryClient, key, row)) {
+            void queryClient.invalidateQueries({ queryKey: key });
+          }
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "orders",
+          filter: `restaurant_id=eq.${restaurant.id}`,
+        },
+        // A new ticket needs its order_items, which the payload doesn't carry.
+        () => void queryClient.invalidateQueries({ queryKey: key }),
       )
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "order_pings" },
-        () => void load(),
+        (payload) => {
+          const ping = payload.new as {
+            order_id: string;
+            eta_minutes: number | null;
+            distance_km: number | null;
+          };
+          // Pings only ever move the arrival estimate on one ticket. Patch it
+          // and leave the rest of the board untouched.
+          patchCachedOrder(queryClient, key, {
+            id: ping.order_id,
+            latestPing: { eta_minutes: ping.eta_minutes, distance_km: ping.distance_km },
+          });
+        },
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [restaurant.id, load]);
+  }, [restaurant.id, key, queryClient]);
 
   const enableAlerts = async () => {
     const result = await requestNotificationPermission();
@@ -209,7 +226,13 @@ function VendorOrders() {
           {restaurant.is_accepting_orders ? "Pause orders" : "Resume orders"}
         </Button>
 
-        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={load} aria-label="Refresh">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9"
+          onClick={() => void refetch()}
+          aria-label="Refresh"
+        >
           <RefreshCw className="h-4 w-4" />
         </Button>
       </div>
@@ -229,10 +252,12 @@ function VendorOrders() {
         </TabsList>
 
         <TabsContent value="live" className="space-y-3 pt-4">
-          {orders === null &&
+          {cooking.length > 0 && <PrepQueue orders={cooking} />}
+
+          {orders === undefined &&
             [0, 1].map((i) => <Skeleton key={i} className="h-64 w-full rounded-2xl" />)}
 
-          {orders !== null && live.length === 0 && (
+          {orders !== undefined && live.length === 0 && (
             <div className="grid place-items-center rounded-2xl border border-dashed px-4 py-16 text-center">
               <ClipboardList className="h-9 w-9 text-muted-foreground" />
               <p className="mt-3 font-medium">No live orders</p>
@@ -244,7 +269,7 @@ function VendorOrders() {
           )}
 
           {live.map((order) => (
-            <OrderTicket key={order.id} order={order} onChanged={load} />
+            <OrderTicket key={order.id} order={order} onChanged={() => void refetch()} />
           ))}
         </TabsContent>
 
@@ -255,7 +280,7 @@ function VendorOrders() {
             </p>
           )}
           {done.map((order) => (
-            <OrderTicket key={order.id} order={order} onChanged={load} />
+            <OrderTicket key={order.id} order={order} onChanged={() => void refetch()} />
           ))}
         </TabsContent>
       </Tabs>

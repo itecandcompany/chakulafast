@@ -142,6 +142,17 @@ DECLARE
   is_customer BOOLEAN;
   is_vendor BOOLEAN;
 BEGIN
+  -- Stamped first, for EVERY writer including admins, server functions and
+  -- the service role. These are derived values that must never come from the
+  -- client, and putting them after the authorisation short-circuits below
+  -- meant an admin nudging a stuck order left ready_at/completed_at null —
+  -- which silently zeroed the vendor's ready-on-time metric.
+  NEW.accepted_at  := COALESCE(OLD.accepted_at,  CASE WHEN NEW.status = 'accepted'  THEN now() END);
+  NEW.preparing_at := COALESCE(OLD.preparing_at, CASE WHEN NEW.status = 'preparing' THEN now() END);
+  NEW.ready_at     := COALESCE(OLD.ready_at,     CASE WHEN NEW.status = 'ready'     THEN now() END);
+  NEW.completed_at := COALESCE(OLD.completed_at, CASE WHEN NEW.status = 'completed' THEN now() END);
+  NEW.cancelled_at := COALESCE(OLD.cancelled_at, CASE WHEN NEW.status = 'cancelled' THEN now() END);
+
   IF pg_trigger_depth() > 1 OR uid IS NULL THEN
     RETURN NEW;
   END IF;
@@ -197,14 +208,8 @@ BEGIN
     END IF;
   END IF;
 
-  -- Pipeline timestamps are stamped here and only here, so they always
-  -- reflect when the transition really happened.
-  NEW.accepted_at  := COALESCE(OLD.accepted_at,  CASE WHEN NEW.status = 'accepted'  THEN now() END);
-  NEW.preparing_at := COALESCE(OLD.preparing_at, CASE WHEN NEW.status = 'preparing' THEN now() END);
-  NEW.ready_at     := COALESCE(OLD.ready_at,     CASE WHEN NEW.status = 'ready'     THEN now() END);
-  NEW.completed_at := COALESCE(OLD.completed_at, CASE WHEN NEW.status = 'completed' THEN now() END);
-  NEW.cancelled_at := COALESCE(OLD.cancelled_at, CASE WHEN NEW.status = 'cancelled' THEN now() END);
-
+  -- (Pipeline timestamps are stamped at the top of this function, before the
+  -- authorisation short-circuits, so every writer gets them.)
   RETURN NEW;
 END;
 $$;

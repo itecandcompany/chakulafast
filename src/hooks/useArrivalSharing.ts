@@ -27,8 +27,19 @@ export function useArrivalSharing(
   const lastPingAt = useRef(0);
   // Held in a ref rather than state so the watch callback never needs to be
   // re-registered, which would restart the GPS subscription.
+  //
+  // Written in an effect, not during render: React can render a component
+  // without committing it (StrictMode, a discarded concurrent render), and a
+  // ref mutated during that render keeps a value the committed tree never
+  // agreed to. Here that would mean pinging the wrong restaurant.
   const destinationRef = useRef(destination);
-  destinationRef.current = destination;
+  useEffect(() => {
+    destinationRef.current = destination;
+    // Keyed on the coordinates, not the object: callers rebuild `destination`
+    // every render, and depending on its identity would rewrite the ref on
+    // every render for no reason.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [destination.lat, destination.lng]);
 
   useEffect(() => {
     if (!enabled) {
@@ -78,6 +89,8 @@ export function useArrivalSharing(
       cancelled = true;
       navigator.geolocation.clearWatch(watchId);
     };
+    // `destination` is absent on purpose: it is read through destinationRef,
+    // so the GPS watch is never torn down and re-registered mid-journey.
   }, [enabled, orderId]);
 
   return { etaMinutes, error };

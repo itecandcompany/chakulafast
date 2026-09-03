@@ -19,8 +19,10 @@ import { useAuth } from "@/lib/auth";
 import { formatKm, formatTsh } from "@/lib/geo";
 import { POPULAR_DISHES } from "@/lib/menuCategories";
 import { TOWNS } from "@/lib/towns";
+import { UPCOMING_FEATURES } from "@/lib/upcoming";
 import { fetchActiveTowns, fetchNearbyRestaurants, type NearbyRestaurant } from "@/lib/search";
 import { useDiscoveryLocation } from "@/hooks/useDiscoveryLocation";
+import { LOCATION_ERROR_KEY } from "@/lib/locationErrors";
 
 export const Route = createFileRoute("/")({ component: Landing });
 
@@ -155,6 +157,14 @@ function Landing() {
                   : t("landing.useMyLocation")}
             </button>
           </div>
+
+          {/* Location is an accelerant, never a requirement — so a failure
+              explains itself and points at the area picker just above. */}
+          {location.locationError && (
+            <p className="mt-2 rounded-lg bg-primary-foreground/10 px-3 py-2 text-xs text-primary-foreground/90">
+              {t(LOCATION_ERROR_KEY[location.locationError])}
+            </p>
+          )}
         </div>
       </header>
 
@@ -190,9 +200,19 @@ function Landing() {
               [0, 1, 2].map((i) => <Skeleton key={i} className="h-24 w-full rounded-2xl" />)}
 
             {nearby?.length === 0 && (
-              <p className="rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">
-                {t("landing.nearbyEmpty")}
-              </p>
+              <div className="rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+                {/* Same distinction as the search page: an empty platform is
+                    not an empty neighbourhood, and saying so keeps a new
+                    launch from reading as a broken app. */}
+                {towns.length === 0 ? (
+                  <>
+                    <p className="font-medium text-foreground">{t("empty.noRestaurantsYet")}</p>
+                    <p className="mt-1">{t("empty.noRestaurantsYetHint")}</p>
+                  </>
+                ) : (
+                  <p>{t("landing.nearbyEmpty")}</p>
+                )}
+              </div>
             )}
 
             {nearby?.map((r) => (
@@ -277,6 +297,27 @@ function Landing() {
               </li>
             ))}
           </ol>
+        </section>
+
+        {/* ---------- Coming soon ---------- */}
+        <section>
+          <h2 className="font-display text-lg font-bold">{t("upcoming.title")}</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{t("upcoming.subtitle")}</p>
+          <ul className="mt-3 space-y-2">
+            {UPCOMING_FEATURES.map((feature) => (
+              <li key={feature.id} className="rounded-2xl border border-dashed bg-card/50 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="font-medium">{t(feature.title)}</h3>
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    {t("upcoming.badge")}
+                  </span>
+                </div>
+                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                  {t(feature.body)}
+                </p>
+              </li>
+            ))}
+          </ul>
         </section>
 
         {/* ---------- Vendor CTA ---------- */}

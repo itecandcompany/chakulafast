@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,32 +13,22 @@ import { toUserMessage } from "@/lib/errorMessages";
 import { useT } from "@/lib/i18n";
 import { isLive, type OrderStatus } from "@/lib/orderStatus";
 import { playAlertChime, showNotification } from "@/lib/notifications";
+import { fetchCustomerOrders, patchCachedOrder } from "@/lib/queries/orders";
+import { qk } from "@/lib/queryClient";
 
 export const Route = createFileRoute("/orders")({
   ssr: false,
   component: OrdersPage,
 });
 
-const SELECT = `
-  id, code, status, total, prep_minutes, expected_arrival_at, created_at,
-  cancel_reason, note,
-  restaurants ( id, name, slug, lat, lng, address ),
-  order_items ( id, name, qty, line_total ),
-  reviews ( id )
-`;
-
 function OrdersPage() {
   const t = useT();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user, loading: authLoading } = useAuth();
 
-  const [orders, setOrders] = useState<CustomerOrder[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [reviewing, setReviewing] = useState<CustomerOrder | null>(null);
-
-  // Remembers which orders were already 'ready' so the alert fires on the
-  // transition rather than on every refetch.
-  const readySeen = useRef<Set<string>>(new Set());
+  const key = qk.customerOrders(user?.id ?? "anonymous");
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -45,64 +36,80 @@ function OrdersPage() {
     }
   }, [user, authLoading, navigate]);
 
-  const load = useCallback(async () => {
-    if (!user) return;
-    try {
-      const { data, error: queryError } = await supabase
-        .from("orders")
-        .select(SELECT)
-        .eq("customer_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(50);
+  const {
+    data: orders,
+    error: queryError,
+    refetch,
+  } = useQuery({
+    queryKey: key,
+    queryFn: () => fetchCustomerOrders(user!.id),
+    enabled: Boolean(user),
+  });
 
-      if (queryError) throw queryError;
+  const error = queryError ? toUserMessage(queryError, "Couldn't load your orders.") : null;
 
-      const rows = (data ?? []) as unknown as CustomerOrder[];
+  // Remembers which orders were already 'ready' so the alert fires on the
+  // transition rather than on every render.
+  const readySeen = useRef<Set<string>>(new Set());
 
-      for (const order of rows) {
-        if (order.status === "ready" && !readySeen.current.has(order.id)) {
-          readySeen.current.add(order.id);
-          playAlertChime();
-          showNotification(
-            t("order.readyNow"),
-            `${order.restaurants?.name ?? ""} · ${t("order.code", { code: order.code })}`,
-            order.id,
-          );
-        }
-      }
-
-      setOrders(rows);
-      setError(null);
-    } catch (err) {
-      setError(toUserMessage(err, "Couldn't load your orders."));
-      setOrders([]);
+  useEffect(() => {
+    if (!orders) return;
+    for (const order of orders) {
+      if (order.status !== "ready" || readySeen.current.has(order.id)) continue;
+      readySeen.current.add(order.id);
+      playAlertChime();
+      showNotification(
+        t("order.readyNow"),
+        `${order.restaurants?.name ?? ""} · ${t("order.code", { code: order.code })}`,
+        order.id,
+      );
     }
-  }, [user, t]);
+  }, [orders, t]);
 
   useEffect(() => {
     if (!user) return;
-    load();
 
     // Realtime is filtered server-side by customer_id, and RLS independently
     // guarantees a customer can only ever receive their own rows.
+    //
+    // An UPDATE moves one column — usually `status` — so it patches the cached
+    // row rather than refetching fifty orders and three joins to learn that a
+    // ticket went from "preparing" to "ready".
     const channel = supabase
       .channel(`customer-orders-${user.id}`)
       .on(
         "postgres_changes",
         {
-          event: "*",
+          event: "UPDATE",
           schema: "public",
           table: "orders",
           filter: `customer_id=eq.${user.id}`,
         },
-        () => load(),
+        (payload) => {
+          const row = payload.new as { id: string };
+          if (!patchCachedOrder(queryClient, key, row)) {
+            void queryClient.invalidateQueries({ queryKey: key });
+          }
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "orders",
+          filter: `customer_id=eq.${user.id}`,
+        },
+        // A newly placed order needs its items and restaurant, which the
+        // payload doesn't carry.
+        () => void queryClient.invalidateQueries({ queryKey: key }),
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, load]);
+  }, [user, key, queryClient]);
 
   if (authLoading || !user) {
     return (
@@ -128,7 +135,7 @@ function OrdersPage() {
           <p className="rounded-xl bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
         )}
 
-        {orders === null && (
+        {orders === undefined && (
           <div className="space-y-3">
             {[0, 1].map((i) => (
               <Skeleton key={i} className="h-56 w-full rounded-2xl" />
@@ -158,7 +165,7 @@ function OrdersPage() {
               <CustomerOrderCard
                 key={order.id}
                 order={order}
-                onChanged={load}
+                onChanged={() => void refetch()}
                 onReview={setReviewing}
               />
             ))}
@@ -174,7 +181,7 @@ function OrdersPage() {
               <CustomerOrderCard
                 key={order.id}
                 order={order}
-                onChanged={load}
+                onChanged={() => void refetch()}
                 onReview={setReviewing}
               />
             ))}
@@ -189,7 +196,7 @@ function OrdersPage() {
           orderId={reviewing.id}
           restaurantId={reviewing.restaurants.id}
           customerId={user.id}
-          onSubmitted={load}
+          onSubmitted={() => void refetch()}
         />
       )}
 
