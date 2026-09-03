@@ -302,6 +302,45 @@ export type Database = {
         };
         Relationships: [];
       };
+      received_payments: {
+        Row: {
+          id: string;
+          reference: string;
+          /** Generated: reference upper-cased with punctuation stripped. */
+          reference_key: string;
+          amount: number;
+          currency: string;
+          msisdn: string | null;
+          paid_at: string | null;
+          source: string;
+          claimed_by: string | null;
+          claimed_at: string | null;
+          recorded_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          reference: string;
+          amount: number;
+          currency?: string;
+          msisdn?: string | null;
+          paid_at?: string | null;
+          source?: string;
+          recorded_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          reference?: string;
+          amount?: number;
+          currency?: string;
+          msisdn?: string | null;
+          paid_at?: string | null;
+          source?: string;
+          claimed_by?: string | null;
+          claimed_at?: string | null;
+        };
+        Relationships: [];
+      };
       registration_payments: {
         Row: {
           amount: number;

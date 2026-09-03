@@ -305,6 +305,38 @@ Default flow (`PAYMENT_PROVIDER=manual`):
 Change the amount or the payment instructions in `platform_settings` — no
 migration needed.
 
+### Automatic activation when a reference reconciles
+
+A human ticking off every registration is a person standing between a
+restaurant that has already paid and a listing that earns them money.
+
+The dangerous way to automate that is to accept any reference that _looks_
+like an M-Pesa transaction ID — that is guessing, not matching, and anyone who
+can type ten plausible characters gets a free listing. So matching here means
+matching against money the platform has actually observed arriving.
+
+`received_payments` is that ledger. Record each mobile-money payment in
+**Admin → Registration payments → Money received** (or point an SMS forwarder
+or provider webhook at the table). A vendor's reference is auto-confirmed only
+when it lines up with an **unclaimed** entry worth at least the fee:
+
+```
+vendor submits "qer 4t5-y7u"
+        │
+        ▼   normalised → QER4T5Y7U
+   received_payments row, unclaimed, amount >= fee ?
+        │                                  │
+       yes                                 no
+        │                                  │
+   claim the row                    stays 'submitted',
+   confirm the payment              waits for an admin
+   listing goes live                (exactly as before)
+```
+
+The ledger entry is marked spent on the registration that used it, so one
+payment can never activate two listings. Only admins can read the table —
+a vendor who could see unclaimed references would simply copy one.
+
 ### Plugging in M-Pesa / Tigo Pesa / Airtel Money
 
 `src/lib/payments/provider.ts` defines the whole contract. `manual.ts`

@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toUserMessage } from "@/lib/errorMessages";
 import { formatTsh } from "@/lib/geo";
 import { adminConfirmPayment, adminRejectPayment } from "@/lib/adminRestaurants.functions";
+import ReceivedPaymentsPanel from "@/components/admin/ReceivedPaymentsPanel";
 import { PAYMENT_METHOD_LABELS } from "@/lib/payments";
 import { PAYMENT_STATUS_COLORS, PAYMENT_STATUS_LABEL } from "@/lib/restaurantStatus";
 import type { Database } from "@/integrations/supabase/types";
@@ -162,8 +163,9 @@ function AdminPayments() {
         <div>
           <h1 className="font-display text-xl font-bold">Registration payments</h1>
           <p className="text-sm text-muted-foreground">
-            Check each reference against the till statement before marking it received — confirming
-            is what publishes the listing.
+            Anything recorded in “Money received” below reconciles itself. What is left here is what
+            did not match — check those against the till statement before marking them received,
+            since confirming is what publishes the listing.
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={load}>
@@ -171,6 +173,8 @@ function AdminPayments() {
           Refresh
         </Button>
       </div>
+
+      <ReceivedPaymentsPanel />
 
       <Tabs defaultValue="pending">
         <TabsList className="w-full">

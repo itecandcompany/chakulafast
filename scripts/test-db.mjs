@@ -909,6 +909,150 @@ check(
 // Put the admin back for anything downstream.
 await db.exec(`insert into public.user_roles (user_id, role) values ('${sneaky.id}', 'admin')`);
 
+console.log("\n=== auto-confirm on reference match ===");
+await asService();
+
+// A second restaurant to register, owned by someone with no admin powers.
+const payerUser = await one(
+  `insert into auth.users (email, raw_user_meta_data)
+   values ('payer@test', '{"full_name":"Payer","role":"restaurant"}'::jsonb) returning id`,
+);
+const payerRest = await one(`
+  insert into public.restaurants (owner_id, name, slug, town, address, lat, lng)
+  values ('${payerUser.id}', 'Kilimanjaro Bites', 'kili-bites', 'Moshi', 'Rau', -3.35, 37.35)
+  returning id, status`);
+check(payerRest.status === "pending_payment", "the new listing starts locked behind the fee");
+
+// --- no ledger entry: nothing happens, exactly as before this feature -------
+const unmatched = await one(`
+  insert into public.registration_payments (restaurant_id, method, reference, status)
+  values ('${payerRest.id}', 'mpesa', 'QWE123RTY', 'submitted')
+  returning id, status`);
+check(
+  unmatched.status === "submitted",
+  `an unrecognised reference waits for a human (${unmatched.status})`,
+);
+const stillLocked = await one(`select status from public.restaurants where id='${payerRest.id}'`);
+check(
+  stillLocked.status === "pending_payment",
+  "and the listing stays locked — a plausible-looking reference is not payment",
+);
+
+// --- the money arrives ------------------------------------------------------
+await db.exec(`insert into public.received_payments (reference, amount, msisdn)
+  values ('qwe 123-rty', 5000, '255700000001')`);
+
+// Correcting the reference to the same value re-triggers the match. Retyping
+// it differently is the realistic case: off a phone screen, with punctuation.
+await db.exec(`update public.registration_payments
+  set reference = 'QWE123RTY' where id = '${unmatched.id}'`);
+
+const matched = await one(
+  `select status, msisdn, note from public.registration_payments where id='${unmatched.id}'`,
+);
+check(
+  matched.status === "confirmed",
+  `a reference matching received money auto-confirms (${matched.status})`,
+);
+check(
+  matched.msisdn === "255700000001",
+  `and carries the payer's number across for reconciliation (${matched.msisdn})`,
+);
+const activated = await one(`select status from public.restaurants where id='${payerRest.id}'`);
+check(activated.status === "active", "the listing goes live with no admin involved");
+
+// --- one payment, one listing ----------------------------------------------
+const ledger = await one(
+  `select claimed_by, claimed_at from public.received_payments where reference_key = 'QWE123RTY'`,
+);
+check(ledger.claimed_by === unmatched.id, "the ledger entry is marked spent on that registration");
+
+const rival = await one(`
+  insert into public.restaurants (owner_id, name, slug, town, address, lat, lng)
+  values ('${customer.id}', 'Copycat Grill', 'copycat', 'Moshi', 'Rau', -3.35, 37.35)
+  returning id`);
+const doubleSpend = await one(`
+  insert into public.registration_payments (restaurant_id, method, reference, status)
+  values ('${rival.id}', 'mpesa', 'QWE123RTY', 'submitted') returning id, status`);
+check(
+  doubleSpend.status === "submitted",
+  `the same reference cannot pay for a second listing (${doubleSpend.status})`,
+);
+const rivalStatus = await one(`select status from public.restaurants where id='${rival.id}'`);
+check(rivalStatus.status === "pending_payment", "so the copycat listing stays locked");
+
+// --- underpayment -----------------------------------------------------------
+await db.exec(`insert into public.received_payments (reference, amount)
+  values ('CHEAP001', 100)`);
+const cheap = await one(`
+  insert into public.registration_payments (restaurant_id, method, reference, status)
+  values ('${rival.id}', 'mpesa', 'CHEAP001', 'submitted') returning id, status`);
+check(
+  cheap.status === "submitted",
+  `money below the 5,000 fee does not activate anything (${cheap.status})`,
+);
+
+// --- a short string must not sweep the ledger -------------------------------
+await db.exec(`insert into public.received_payments (reference, amount) values ('AB12', 9000)`);
+const tooShort = await one(`
+  insert into public.registration_payments (restaurant_id, method, reference, status)
+  values ('${rival.id}', 'mpesa', 'AB12', 'submitted') returning id, status`);
+check(
+  tooShort.status === "submitted",
+  "a reference too short to be a transaction ID never matches",
+);
+
+// --- who may touch what ----------------------------------------------------
+// The ledger is the secret this whole mechanism rests on: a vendor who could
+// read unclaimed references would just copy one.
+const peekLedger = await as(
+  "authenticated",
+  customer.id,
+  `select id from public.received_payments`,
+);
+check(peekLedger.rows.length === 0, "a vendor cannot read the received-payments ledger");
+
+check(
+  await denied(
+    "authenticated",
+    customer.id,
+    `insert into public.received_payments (reference, amount) values ('FORGED0001', 9000)`,
+  ),
+  "a vendor cannot record money into the ledger",
+);
+
+// Correcting a mistyped reference is the whole reason vendors got an UPDATE
+// policy, so it has to actually work.
+const corrected = await as(
+  "authenticated",
+  customer.id,
+  `update public.registration_payments set reference = 'NEWREF999'
+     where id = '${cheap.id}' returning reference`,
+);
+check(corrected.rows.length === 1, "a vendor can correct their own mistyped reference");
+
+// ...and that policy must not have handed them a way to confirm themselves.
+let selfPromoted = false;
+let selfPromoteRows = -1;
+try {
+  const r = await as(
+    "authenticated",
+    customer.id,
+    `update public.registration_payments set status = 'confirmed'
+       where id = '${cheap.id}' returning id`,
+  );
+  selfPromoteRows = r.rows.length;
+} catch (e) {
+  selfPromoted = /Only the payment reference and method can be corrected/.test(e.message);
+}
+const cheapAfter = await one(
+  `select status from public.registration_payments where id = '${cheap.id}'`,
+);
+check(
+  (selfPromoted || selfPromoteRows === 0) && cheapAfter.status === "submitted",
+  `the new UPDATE policy did not hand vendors self-confirmation (still ${cheapAfter.status})`,
+);
+
 console.log(
   `\n${"=".repeat(52)}\n${failures === 0 ? "ALL CHECKS PASSED" : failures + " CHECK(S) FAILED"}\n${"=".repeat(52)}`,
 );
