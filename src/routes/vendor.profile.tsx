@@ -36,6 +36,7 @@ function VendorProfile() {
   const [town, setTown] = useState(restaurant.town);
   const [address, setAddress] = useState(restaurant.address);
   const [prepMinutes, setPrepMinutes] = useState(String(restaurant.avg_prep_minutes));
+  const [capacity, setCapacity] = useState(String(restaurant.kitchen_capacity));
   const [coords, setCoords] = useState({ lat: restaurant.lat, lng: restaurant.lng });
   const [saving, setSaving] = useState(false);
   const [locating, setLocating] = useState(false);
@@ -48,6 +49,7 @@ function VendorProfile() {
     setTown(restaurant.town);
     setAddress(restaurant.address);
     setPrepMinutes(String(restaurant.avg_prep_minutes));
+    setCapacity(String(restaurant.kitchen_capacity));
     setCoords({ lat: restaurant.lat, lng: restaurant.lng });
   }, [restaurant]);
 
@@ -67,6 +69,7 @@ function VendorProfile() {
           lat: coords.lat,
           lng: coords.lng,
           avg_prep_minutes: Math.min(240, Math.max(1, Number(prepMinutes) || 20)),
+          kitchen_capacity: Math.min(500, Math.max(0, Number(capacity) || 0)),
         })
         .eq("id", restaurant.id);
       if (error) throw error;
@@ -288,6 +291,24 @@ function VendorProfile() {
             value={prepMinutes}
             onChange={(e) => setPrepMinutes(e.target.value)}
           />
+        </div>
+
+        <div>
+          <label htmlFor="profile-capacity" className="mb-1.5 block text-sm font-medium">
+            Orders you can cook at once
+          </label>
+          <Input
+            id="profile-capacity"
+            type="number"
+            min={0}
+            max={500}
+            value={capacity}
+            onChange={(e) => setCapacity(e.target.value)}
+          />
+          <p className="mt-1 text-xs text-muted-foreground">
+            When this many orders are already due around the same time, new customers are offered a
+            later slot instead of being added to the rush. Leave it at 0 for no limit.
+          </p>
         </div>
 
         <Button onClick={save} disabled={saving || !name.trim() || !address.trim()}>

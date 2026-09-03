@@ -148,6 +148,11 @@ const en = {
   "cart.phoneHint": "So the kitchen can reach you if something is unclear.",
   "cart.place": "Place pre-order",
   "cart.placing": "Sending…",
+  "cart.kitchenFull": "{name} is fully booked for that time.",
+  "cart.kitchenFullHint": "Their kitchen can have it hot for you at {time}.",
+  "cart.kitchenFullNoSlot":
+    "They have no free slot in the next few hours. Try another restaurant, or come back later.",
+  "cart.kitchenFullAccept": "Arrive at {time} instead",
   "cart.switchRestaurant": "Start a new basket?",
   "cart.switchRestaurantBody":
     "Your basket has food from {current}. Adding this dish will clear it and start a new order at {next}.",
@@ -380,6 +385,11 @@ const sw: Record<TKey, string> = {
   "cart.phoneHint": "Ili jiko liweze kukupata endapo kuna jambo halijaeleweka.",
   "cart.place": "Tuma oda ya mapema",
   "cart.placing": "Inatuma…",
+  "cart.kitchenFull": "{name} wamejaa kwa muda huo.",
+  "cart.kitchenFullHint": "Jiko lao linaweza kukuandalia chakula cha moto saa {time}.",
+  "cart.kitchenFullNoSlot":
+    "Hawana nafasi kwa saa chache zijazo. Jaribu mgahawa mwingine, au rudi baadaye.",
+  "cart.kitchenFullAccept": "Fika saa {time} badala yake",
   "cart.switchRestaurant": "Anza kikapu kipya?",
   "cart.switchRestaurantBody":
     "Kikapu chako kina chakula cha {current}. Ukiongeza chakula hiki kitafutwa na kuanza oda mpya {next}.",

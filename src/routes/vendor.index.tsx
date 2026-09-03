@@ -6,6 +6,7 @@ import { Bell, BellOff, ClipboardList, Power, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import PrepQueue from "@/components/vendor/PrepQueue";
 import OrderTicket, { type VendorOrder } from "@/components/vendor/OrderTicket";
 import { supabase } from "@/integrations/supabase/client";
 import { toUserMessage } from "@/lib/errorMessages";
@@ -251,6 +252,8 @@ function VendorOrders() {
         </TabsList>
 
         <TabsContent value="live" className="space-y-3 pt-4">
+          {cooking.length > 0 && <PrepQueue orders={cooking} />}
+
           {orders === undefined &&
             [0, 1].map((i) => <Skeleton key={i} className="h-64 w-full rounded-2xl" />)}
 

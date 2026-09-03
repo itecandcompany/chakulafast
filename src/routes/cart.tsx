@@ -12,6 +12,7 @@ import { useAuth } from "@/lib/auth";
 import { cartPrepMinutes, cartSubtotal, useCart, useCartHydrated } from "@/lib/cart";
 import { toUserMessage } from "@/lib/errorMessages";
 import { formatTsh } from "@/lib/geo";
+import { arrivalClock, checkKitchenSlot, isKitchenFullError } from "@/lib/kitchenSlot";
 import { useT } from "@/lib/i18n";
 
 export const Route = createFileRoute("/cart")({
@@ -41,6 +42,10 @@ function CartPage() {
   const [note, setNote] = useState("");
   const [phone, setPhone] = useState("");
   const [placing, setPlacing] = useState(false);
+  // Set when the kitchen is full for the chosen time; carries the alternative.
+  const [slotConflict, setSlotConflict] = useState<{ suggestedMinutes: number | null } | null>(
+    null,
+  );
 
   useEffect(() => {
     if (profile?.phone) setPhone(profile.phone);
@@ -49,7 +54,7 @@ function CartPage() {
   const subtotal = cartSubtotal(lines);
   const prepMinutes = cartPrepMinutes(lines);
 
-  const placeOrder = async () => {
+  const placeOrder = async (overrideMinutes?: number) => {
     if (!restaurant || lines.length === 0) return;
 
     if (!user) {
@@ -60,10 +65,26 @@ function CartPage() {
       return;
     }
 
+    const arrivalMinutes = overrideMinutes ?? arrival.minutes;
+
     setPlacing(true);
     let orderId: string | null = null;
 
     try {
+      // Ask before committing. The kitchen may already have as much food due
+      // at this time as it can physically cook, and finding that out now — with
+      // a workable alternative attached — beats a confirmed order that turns
+      // up late. Skipped when the customer has just accepted a suggested slot.
+      if (overrideMinutes === undefined) {
+        const slot = await checkKitchenSlot(restaurant.id, prepMinutes, arrivalMinutes);
+        if (slot && !slot.available) {
+          setSlotConflict({ suggestedMinutes: slot.suggestedMinutes });
+          setPlacing(false);
+          return;
+        }
+        setSlotConflict(null);
+      }
+
       // Totals, prep time and the order code are all filled in by database
       // triggers — nothing derived is trusted from here.
       const { data: order, error: orderError } = await supabase
@@ -72,7 +93,7 @@ function CartPage() {
           customer_id: user.id,
           restaurant_id: restaurant.id,
           arrival_mode: arrival.mode,
-          arrival_minutes: arrival.minutes,
+          arrival_minutes: arrivalMinutes,
           note: note.trim() || null,
           customer_phone: phone.trim() || null,
           customer_lat: arrival.position?.lat ?? null,
@@ -113,7 +134,15 @@ function CartPage() {
           .update({ status: "cancelled", cancel_reason: "Could not be completed" })
           .eq("id", orderId);
       }
-      toast.error(toUserMessage(err, "Couldn't place your order."));
+      // Someone took the last slot between the check and the insert. The
+      // trigger is the authority, so surface its answer rather than a
+      // generic failure.
+      if (isKitchenFullError(err)) {
+        const slot = await checkKitchenSlot(restaurant.id, prepMinutes, arrivalMinutes);
+        setSlotConflict({ suggestedMinutes: slot?.suggestedMinutes ?? null });
+      } else {
+        toast.error(toUserMessage(err, "Couldn't place your order."));
+      }
     } finally {
       setPlacing(false);
     }
@@ -269,6 +298,46 @@ function CartPage() {
         </section>
       </main>
 
+      {/* ---------- Kitchen full: offer the time they can actually cook ----- */}
+      {slotConflict && (
+        <div className="fixed inset-x-0 bottom-[136px] z-40 mx-auto max-w-2xl px-4 lg:bottom-[64px] lg:left-60 lg:max-w-none lg:px-10">
+          <div className="mx-auto max-w-3xl rounded-xl border border-amber-500/40 bg-amber-50 p-3 text-sm dark:bg-amber-950/40">
+            <p className="font-medium text-amber-900 dark:text-amber-100">
+              {t("cart.kitchenFull", { name: restaurant.name })}
+            </p>
+            {slotConflict.suggestedMinutes == null ? (
+              <p className="mt-1 text-xs text-amber-800 dark:text-amber-200">
+                {t("cart.kitchenFullNoSlot")}
+              </p>
+            ) : (
+              <>
+                <p className="mt-1 text-xs text-amber-800 dark:text-amber-200">
+                  {t("cart.kitchenFullHint", {
+                    time: arrivalClock(slotConflict.suggestedMinutes),
+                  })}
+                </p>
+                <Button
+                  size="sm"
+                  className="mt-2"
+                  disabled={placing}
+                  onClick={() => {
+                    const minutes = slotConflict.suggestedMinutes;
+                    if (minutes == null) return;
+                    setArrival((a) => ({ ...a, minutes }));
+                    setSlotConflict(null);
+                    void placeOrder(minutes);
+                  }}
+                >
+                  {t("cart.kitchenFullAccept", {
+                    time: arrivalClock(slotConflict.suggestedMinutes),
+                  })}
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ---------- Sticky total + submit ---------- */}
       <div className="fixed inset-x-0 bottom-[72px] z-40 mx-auto max-w-2xl border-t bg-background/95 px-4 py-3 backdrop-blur lg:bottom-0 lg:left-60 lg:max-w-none lg:px-10">
         <div className="mx-auto flex max-w-3xl items-center gap-3">
@@ -276,7 +345,7 @@ function CartPage() {
             <p className="text-xs text-muted-foreground">{t("cart.subtotal")}</p>
             <p className="font-display text-lg font-bold leading-tight">{formatTsh(subtotal)}</p>
           </div>
-          <Button size="lg" className="h-12 flex-1" onClick={placeOrder} disabled={placing}>
+          <Button size="lg" className="h-12 flex-1" onClick={() => placeOrder()} disabled={placing}>
             {placing ? t("cart.placing") : user ? t("cart.place") : t("cart.signInFirst")}
           </Button>
         </div>

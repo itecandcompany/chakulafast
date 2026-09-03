@@ -398,6 +398,7 @@ export type Database = {
           description: string | null;
           id: string;
           is_accepting_orders: boolean;
+          kitchen_capacity: number;
           lat: number;
           lng: number;
           logo_url: string | null;
@@ -419,6 +420,7 @@ export type Database = {
           description?: string | null;
           id?: string;
           is_accepting_orders?: boolean;
+          kitchen_capacity?: number;
           lat: number;
           lng: number;
           logo_url?: string | null;
@@ -435,6 +437,7 @@ export type Database = {
           cover_url?: string | null;
           description?: string | null;
           is_accepting_orders?: boolean;
+          kitchen_capacity?: number;
           lat?: number;
           lng?: number;
           logo_url?: string | null;
@@ -531,6 +534,16 @@ export type Database = {
       haversine_km: {
         Args: { lat1: number; lng1: number; lat2: number; lng2: number };
         Returns: number;
+      };
+      check_kitchen_slot: {
+        Args: { _restaurant: string; _prep_minutes: number; _arrival_minutes: number };
+        Returns: {
+          available: boolean;
+          capacity: number;
+          busy: number;
+          /** Minutes from now, not a timestamp — the unit the customer picked. */
+          suggested_minutes: number | null;
+        }[];
       };
       is_restaurant_open: {
         Args: { _restaurant_id: string; _at?: string };
