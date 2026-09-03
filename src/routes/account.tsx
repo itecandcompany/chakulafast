@@ -106,7 +106,7 @@ function AccountPage() {
 
   return (
     <div className="min-h-[var(--app-100vh)] bg-background pb-24 lg:pb-8 lg:pl-60">
-      <header className="border-b bg-background px-4 py-4 sm:px-6 lg:px-10">
+      <header className="border-b bg-background px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6 lg:px-10">
         <div className="mx-auto max-w-3xl">
           <h1 className="font-display text-xl font-bold">{t("account.title")}</h1>
         </div>
