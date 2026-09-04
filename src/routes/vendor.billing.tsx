@@ -31,6 +31,9 @@ function VendorBilling() {
   const { restaurant, refresh } = useVendor();
 
   const [context, setContext] = useState<BillingContext | null>(null);
+  // Held separately from `context` so a failure shows an explanation on the
+  // page rather than a skeleton that never resolves.
+  const [contextError, setContextError] = useState<string | null>(null);
   const [payments, setPayments] = useState<Payment[] | null>(null);
   const [method, setMethod] = useState<PaymentMethod>("cash");
   const [reference, setReference] = useState("");
@@ -52,9 +55,37 @@ function VendorBilling() {
   }, [restaurant.id]);
 
   useEffect(() => {
-    getBillingContext()
-      .then(setContext)
-      .catch((err) => toast.error(toUserMessage(err, "Couldn't load billing details.")));
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const result: unknown = await getBillingContext();
+        if (cancelled) return;
+
+        // A server function that fails its middleware does not always reject —
+        // it can resolve with the error payload instead. So a truthy result is
+        // not proof of a usable one, and trusting it here is what turned a
+        // recoverable server-side failure into a crashed page: the render read
+        // `context.provider.label` on a value that had no provider at all.
+        const usable =
+          !!result && typeof result === "object" && !!(result as BillingContext).provider;
+
+        if (!usable) {
+          setContextError(
+            "The server couldn't load your billing details. Two things usually cause this: the site's server-side Supabase keys (SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY) are missing from the deployment, or this account's email address has not been confirmed.",
+          );
+          return;
+        }
+
+        setContext(result as BillingContext);
+      } catch (err) {
+        if (!cancelled) setContextError(toUserMessage(err, "Couldn't load billing details."));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -155,7 +186,11 @@ function VendorBilling() {
       {/* ---------- Pay ---------- */}
       {!isActive && (
         <section className="rounded-2xl border bg-card p-4 shadow-card">
-          {context === null ? (
+          {contextError ? (
+            <p className="rounded-xl bg-destructive/10 p-3 text-sm text-destructive">
+              {contextError}
+            </p>
+          ) : context === null ? (
             <Skeleton className="h-40 w-full" />
           ) : (
             <>

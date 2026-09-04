@@ -4,15 +4,20 @@
 // For user-authenticated queries (with RLS), use the auth middleware instead.
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
+import {
+  describeMissingServerEnv,
+  serverSupabaseServiceRoleKey,
+  serverSupabaseUrl,
+} from "@/lib/serverEnv";
 
 function createSupabaseAdminClient() {
-  const SUPABASE_URL = process.env.SUPABASE_URL;
-  const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  // The URL may come from the VITE_ copy — it is public either way. The
+  // service-role key deliberately has no such fallback: see serverEnv.ts.
+  const SUPABASE_URL = serverSupabaseUrl();
+  const SUPABASE_SERVICE_ROLE_KEY = serverSupabaseServiceRoleKey();
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-    throw new Error(
-      "Missing Supabase server environment variables. Ensure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set.",
-    );
+    throw new Error(describeMissingServerEnv(true));
   }
 
   return createClient<Database>(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {

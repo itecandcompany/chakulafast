@@ -2,6 +2,11 @@ import { createMiddleware } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
+import {
+  describeMissingServerEnv,
+  serverSupabasePublishableKey,
+  serverSupabaseUrl,
+} from "@/lib/serverEnv";
 
 export const enforceEmailConfirmed = createMiddleware({ type: "function" }).server(
   async ({ next }) => {
@@ -10,10 +15,10 @@ export const enforceEmailConfirmed = createMiddleware({ type: "function" }).serv
     if (!authHeader?.startsWith("Bearer ")) throw new Response("Unauthorized", { status: 401 });
 
     const token = authHeader.slice("Bearer ".length);
-    const SUPABASE_URL = process.env.SUPABASE_URL;
-    const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY;
+    const SUPABASE_URL = serverSupabaseUrl();
+    const SUPABASE_PUBLISHABLE_KEY = serverSupabasePublishableKey();
     if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY)
-      throw new Response("Server misconfigured", { status: 500 });
+      throw new Response(describeMissingServerEnv(), { status: 500 });
 
     const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
       global: { headers: { Authorization: `Bearer ${token}` } },
