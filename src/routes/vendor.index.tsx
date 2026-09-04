@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Bell, BellOff, ClipboardList, Power, RefreshCw } from "lucide-react";
@@ -28,7 +28,10 @@ function VendorOrders() {
   const { restaurant, refresh } = useVendor();
   const now = useNow(15_000);
   const queryClient = useQueryClient();
-  const key = qk.vendorOrders(restaurant.id);
+  // Memoised because it is an effect dependency. qk.* builds a fresh array
+  // each call, so without this the realtime channel below is torn down and
+  // re-subscribed on every single render.
+  const key = useMemo(() => qk.vendorOrders(restaurant.id), [restaurant.id]);
 
   const [alertsOn, setAlertsOn] = useState(false);
   const [togglingOpen, setTogglingOpen] = useState(false);

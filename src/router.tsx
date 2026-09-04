@@ -28,10 +28,30 @@ function DefaultErrorComponent({ error, reset }: { error: Error; reset: () => vo
         <p className="mt-2 text-sm text-muted-foreground">
           An unexpected error occurred. Please try again.
         </p>
-        {import.meta.env.DEV && error.message && (
-          <pre className="mt-4 max-h-40 overflow-auto rounded-md bg-muted p-3 text-left font-mono text-xs text-destructive">
-            {error.message}
-          </pre>
+        {/* Shown in production too, behind a disclosure.
+         *
+         * This used to be DEV-only, which meant every production failure
+         * reached the operator as "an unexpected error occurred" and nothing
+         * else — undiagnosable without asking the person on the other end to
+         * open devtools, which is not a reasonable thing to ask a restaurant
+         * owner in the middle of service.
+         *
+         * Collapsed by default so a customer is not handed a stack trace, and
+         * open in one click for anyone reporting a fault. This is a client-side
+         * error object: it holds nothing the browser did not already have. */}
+        {error.message && (
+          <details className="mt-4 text-left">
+            <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
+              Show technical details
+            </summary>
+            <pre className="mt-2 max-h-56 overflow-auto rounded-md bg-muted p-3 font-mono text-xs text-destructive">
+              {error.message}
+              {error.stack ? `\n\n${error.stack}` : ""}
+            </pre>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Copy this when reporting the problem — it names the actual fault.
+            </p>
+          </details>
         )}
         <div className="mt-6 flex items-center justify-center gap-3">
           <button

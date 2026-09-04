@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,9 @@ function OrdersPage() {
   const { user, loading: authLoading } = useAuth();
 
   const [reviewing, setReviewing] = useState<CustomerOrder | null>(null);
-  const key = qk.customerOrders(user?.id ?? "anonymous");
+  // Memoised: qk.* returns a new array per call, and this is an effect
+  // dependency for the realtime subscription.
+  const key = useMemo(() => qk.customerOrders(user?.id ?? "anonymous"), [user?.id]);
 
   useEffect(() => {
     if (!authLoading && !user) {
