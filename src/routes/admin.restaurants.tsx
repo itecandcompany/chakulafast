@@ -2,7 +2,16 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ExternalLink, MapPin, RefreshCw, Search, Trash2, UtensilsCrossed } from "lucide-react";
+import {
+  Check,
+  ExternalLink,
+  MapPin,
+  RefreshCw,
+  RotateCcw,
+  Search,
+  Trash2,
+  UtensilsCrossed,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -23,7 +32,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { supabase } from "@/integrations/supabase/client";
 import { toUserMessage } from "@/lib/errorMessages";
 import { fetchAdminRestaurants } from "@/lib/queries/adminTables";
 import { qk } from "@/lib/queryClient";
@@ -89,6 +97,46 @@ function AdminRestaurants() {
       await load();
     } catch (err) {
       toast.error(toUserMessage(err, "Couldn't update that listing."));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  /**
+   * The one-click path for the commonest action in the console: a restaurant
+   * has registered, the fee has been handed over, publish it.
+   *
+   * The note is not decoration. Approving straight from here is what cash
+   * collection looks like -- there is no registration_payments row to point at
+   * afterwards -- so the audit entry is the only record that the fee was ever
+   * received, and from whom. adminSetRestaurantStatus passes `reason` through
+   * to the log even though `suspended_reason` is only stored for suspensions.
+   */
+  const approve = async (restaurant: Restaurant) => {
+    // A first publication and a restoration are the same status change but
+    // completely different questions. Asking a suspended listing how its
+    // registration fee was paid would be asking about something settled
+    // months ago.
+    const firstPublication = restaurant.status === "pending_payment";
+
+    const note = window.prompt(
+      firstPublication
+        ? `Publish "${restaurant.name}"? Note how the registration fee was paid — this is kept in the activity log.`
+        : `Restore "${restaurant.name}" to live? Note why — this is kept in the activity log.`,
+      firstPublication ? "Cash received in person" : "Issue resolved",
+    );
+    // Dismissing the prompt is "changed my mind", not "no note given".
+    if (note === null) return;
+
+    setBusyId(restaurant.id);
+    try {
+      await adminSetRestaurantStatus({
+        data: { restaurantId: restaurant.id, status: "active", reason: note.trim() || null },
+      });
+      toast.success(`${restaurant.name} is live — customers can find it now.`);
+      await load();
+    } catch (err) {
+      toast.error(toUserMessage(err, "Couldn't publish that listing."));
     } finally {
       setBusyId(null);
     }
@@ -217,6 +265,35 @@ function AdminRestaurants() {
                   >
                     <ExternalLink className="h-4 w-4" />
                   </Link>
+                </Button>
+              )}
+
+              {/* The commonest action in the console gets a button, not a
+                  fourth option inside a dropdown. A listing sitting at
+                  pending_payment is a restaurant that has done everything
+                  asked of it and is waiting on this one click. */}
+              {restaurant.status === "pending_payment" && (
+                <Button
+                  size="sm"
+                  className="h-9"
+                  onClick={() => approve(restaurant)}
+                  disabled={busyId === restaurant.id}
+                >
+                  <Check className="h-3.5 w-3.5" />
+                  Approve
+                </Button>
+              )}
+
+              {(restaurant.status === "suspended" || restaurant.status === "rejected") && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9"
+                  onClick={() => approve(restaurant)}
+                  disabled={busyId === restaurant.id}
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Restore
                 </Button>
               )}
 
