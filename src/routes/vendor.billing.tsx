@@ -14,6 +14,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { toUserMessage } from "@/lib/errorMessages";
+import { describeServerFnFailure } from "@/lib/serverFnErrors";
 import { formatTsh } from "@/lib/geo";
 import { PAYMENT_METHOD_LABELS } from "@/lib/payments";
 import type { PaymentMethod } from "@/lib/payments";
@@ -62,18 +63,16 @@ function VendorBilling() {
         const result: unknown = await getBillingContext();
         if (cancelled) return;
 
-        // A server function that fails its middleware does not always reject —
-        // it can resolve with the error payload instead. So a truthy result is
-        // not proof of a usable one, and trusting it here is what turned a
-        // recoverable server-side failure into a crashed page: the render read
-        // `context.provider.label` on a value that had no provider at all.
+        // A server function that fails its middleware does not reject — it
+        // resolves with an error envelope, `{ status, unhandled, message }`.
+        // So a truthy result is not proof of a usable one, and trusting it is
+        // what turned a recoverable failure into a crashed page: the render
+        // read `context.provider.label` on a value that had no provider.
         const usable =
           !!result && typeof result === "object" && !!(result as BillingContext).provider;
 
         if (!usable) {
-          setContextError(
-            "The server couldn't load your billing details. Two things usually cause this: the site's server-side Supabase keys (SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY) are missing from the deployment, or this account's email address has not been confirmed.",
-          );
+          setContextError(describeServerFnFailure(result, "load your billing details"));
           return;
         }
 
