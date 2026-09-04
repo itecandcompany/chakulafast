@@ -20,6 +20,8 @@ function VendorLayout() {
 
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [checked, setChecked] = useState(false);
+  // True while a look-up triggered by navigation is still in flight.
+  const [verifying, setVerifying] = useState(false);
 
   const userId = user?.id;
 
@@ -45,16 +47,34 @@ function VendorLayout() {
     }
   }, [user, profile, loading, navigate]);
 
+  // Re-checked on every navigation inside the dashboard, not only on mount.
+  //
+  // This is what makes "create a listing" reach the payment page. /vendor/setup
+  // sits outside VendorProvider — there is no restaurant to provide yet — so it
+  // cannot refresh this state itself. It inserts the row and navigates to
+  // /vendor/billing while `restaurant` here is still null and `checked` is
+  // still true from the look-up that found nothing, and the redirect below
+  // reads that stale pair as "this owner has no listing" and sends them back
+  // to the form they just submitted.
+  //
+  // `verifying` is separate from `checked` on purpose. It holds the redirect
+  // back until the new answer lands, without blanking the dashboard: reusing
+  // `checked` would drop every vendor page to "Loading dashboard…" on every
+  // click, which on a slow connection is a worse screen than the bug it fixes.
+  // The cost is one indexed query per navigation, which also keeps the status
+  // banner honest when an admin confirms payment mid-session.
   useEffect(() => {
-    if (!loading && profile?.role === "restaurant") void refresh();
-  }, [loading, profile?.role, refresh]);
+    if (loading || profile?.role !== "restaurant") return;
+    setVerifying(true);
+    void refresh().finally(() => setVerifying(false));
+  }, [loading, profile?.role, pathname, refresh]);
 
   // An owner with no listing has nothing to manage — send them to create one.
   // `/vendor/setup` is the one page that must stay reachable in that state.
   useEffect(() => {
-    if (!checked || restaurant || pathname === "/vendor/setup") return;
+    if (!checked || verifying || restaurant || pathname === "/vendor/setup") return;
     navigate({ to: "/vendor/setup" });
-  }, [checked, restaurant, pathname, navigate]);
+  }, [checked, verifying, restaurant, pathname, navigate]);
 
   // Payment gates the *listing*, not the dashboard: an unpaid restaurant can
   // still set up its menu and hours so it's ready to go the moment the fee
