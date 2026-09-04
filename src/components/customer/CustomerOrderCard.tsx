@@ -57,7 +57,16 @@ export type CustomerOrder = {
     line_total: number;
     menu_item_id: string | null;
   }[];
-  reviews: { id: string }[];
+  /**
+   * An object or null, NOT an array.
+   *
+   * reviews.order_id carries a UNIQUE constraint, so PostgREST resolves the
+   * embed as to-one and sends `null` when the order has not been reviewed.
+   * Typing it as an array is what produced
+   * "Cannot read properties of null (reading 'length')" on every completed
+   * order awaiting a review — the one state where this branch is reached.
+   */
+  reviews: { id: string } | null;
 };
 
 export default function CustomerOrderCard({
@@ -319,7 +328,7 @@ export default function CustomerOrderCard({
             {t("order.reorder")}
           </Button>
 
-          {order.status === "completed" && order.reviews.length === 0 && (
+          {order.status === "completed" && !order.reviews && (
             <Button variant="ghost" size="sm" className="h-9" onClick={() => onReview(order)}>
               <Star className="h-3.5 w-3.5" />
               {t("order.rate")}
