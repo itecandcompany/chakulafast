@@ -126,8 +126,11 @@ function VendorSetup() {
       );
       if (hoursError) console.error(hoursError);
 
-      toast.success("Listing created — pay the registration fee to go live.");
-      navigate({ to: "/vendor/billing" });
+      toast.success("Listing created. Add your menu — we'll publish it once the fee clears.");
+      // Land on the dashboard, not the payment page. The fee still has to be
+      // paid, and the banner there says so on every screen, but the first
+      // thing a new owner should see is the thing they just built.
+      navigate({ to: "/vendor" });
     } catch (err) {
       toast.error(toUserMessage(err, "Couldn't create your listing."));
     } finally {

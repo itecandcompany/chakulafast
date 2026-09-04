@@ -1,6 +1,7 @@
-import { createFileRoute, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import VendorSidebar from "@/components/vendor/VendorSidebar";
 import { supabase } from "@/integrations/supabase/client";
@@ -49,13 +50,13 @@ function VendorLayout() {
 
   // Re-checked on every navigation inside the dashboard, not only on mount.
   //
-  // This is what makes "create a listing" reach the payment page. /vendor/setup
+  // This is what lets "create a listing" arrive anywhere at all. /vendor/setup
   // sits outside VendorProvider — there is no restaurant to provide yet — so it
-  // cannot refresh this state itself. It inserts the row and navigates to
-  // /vendor/billing while `restaurant` here is still null and `checked` is
-  // still true from the look-up that found nothing, and the redirect below
-  // reads that stale pair as "this owner has no listing" and sends them back
-  // to the form they just submitted.
+  // cannot refresh this state itself. It inserts the row and navigates away
+  // while `restaurant` here is still null and `checked` is still true from the
+  // look-up that found nothing, and the redirect below reads that stale pair as
+  // "this owner has no listing" and sends them back to the form they just
+  // submitted.
   //
   // `verifying` is separate from `checked` on purpose. It holds the redirect
   // back until the new answer lands, without blanking the dashboard: reusing
@@ -76,16 +77,13 @@ function VendorLayout() {
     navigate({ to: "/vendor/setup" });
   }, [checked, verifying, restaurant, pathname, navigate]);
 
-  // Payment gates the *listing*, not the dashboard: an unpaid restaurant can
-  // still set up its menu and hours so it's ready to go the moment the fee
-  // clears. Only the order board is pointless before then, since customers
-  // can't see the listing to order from it.
-  useEffect(() => {
-    if (!restaurant) return;
-    if (restaurant.status === "pending_payment" && pathname === "/vendor") {
-      navigate({ to: "/vendor/billing" });
-    }
-  }, [restaurant, pathname, navigate]);
+  // There used to be a redirect here sending an unpaid restaurant from /vendor
+  // to /vendor/billing. Its own comment said "payment gates the listing, not
+  // the dashboard" while the code did exactly the opposite: a newly registered
+  // owner could never reach their dashboard at all, because every attempt
+  // bounced to the payment page. The banner below says the same thing without
+  // taking the dashboard away — they can build their menu and set their hours
+  // while the fee is being sorted out, and be ready the moment it clears.
 
   if (loading || !profile || profile.role !== "restaurant") {
     return (
@@ -123,6 +121,20 @@ function VendorLayout() {
                 {profile.full_name}
               </div>
             </header>
+
+            {restaurant.status === "pending_payment" && (
+              <div className="flex flex-wrap items-start gap-2 border-b bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <p className="min-w-0 flex-1">
+                  This listing is not live yet — customers cannot find it until the registration fee
+                  is confirmed. You can still build your menu and set your hours; everything is
+                  published the moment it clears.
+                </p>
+                <Button asChild size="sm" variant="outline" className="h-8">
+                  <Link to="/vendor/billing">Pay the fee</Link>
+                </Button>
+              </div>
+            )}
 
             {restaurant.status === "suspended" && (
               <div className="flex items-start gap-2 border-b bg-destructive/10 px-4 py-3 text-sm text-destructive">
