@@ -78,6 +78,39 @@ export const adminSetRestaurantStatus = createServerFn({ method: "POST" })
 
     if (error) throw new Error("Unable to update the listing");
 
+    // Publishing a listing settles its fee.
+    //
+    // An admin who approves a restaurant has been paid — in cash, usually,
+    // which is why they are approving from the listings screen rather than
+    // confirming a transaction reference. Leaving the payment row at
+    // "submitted" left the vendor staring at "Awaiting verification" on a
+    // listing that was already live, and left the platform with a live
+    // restaurant whose fee looked outstanding.
+    //
+    // Only unsettled rows are touched, so this cannot reopen or overwrite a
+    // payment that was already confirmed or rejected. The activation trigger
+    // on registration_payments then finds the restaurant already active and
+    // its WHERE clause matches nothing, so nothing loops.
+    if (data.status === "active") {
+      const { error: settleError } = await supabaseAdmin
+        .from("registration_payments")
+        .update({
+          status: "confirmed",
+          confirmed_by: context.userId,
+          confirmed_at: new Date().toISOString(),
+          note: data.reason ?? null,
+        })
+        .eq("restaurant_id", data.restaurantId)
+        .in("status", ["pending", "submitted"]);
+
+      // Not fatal: the listing is live either way, and a stuck payment row is
+      // a reconciliation job for the payments screen, not a reason to refuse
+      // an approval that has already succeeded.
+      if (settleError) {
+        console.error("[admin] listing approved but payment not settled", settleError.message);
+      }
+    }
+
     await recordAdminAction(supabaseAdmin, {
       actorId: context.userId,
       action: `restaurant.${data.status}`,
