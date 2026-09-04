@@ -97,27 +97,36 @@ To point it at a different email before you deploy, edit the `UPDATE` in
 
 ### 3. Seed an admin and demo data
 
+The fastest route to a working administrator — no signup form, no email
+confirmation, no `/bootstrap`. The account is created with `email_confirm`
+already true, so it can sign in immediately:
+
 ```bash
-npm run seed:admin
+npm run seed:admin -- you@example.com 'YourStrongPassword1'
 ```
+
+Both arguments are required. There is deliberately no default password: one
+used to be written into the script, which published a working set of admin
+credentials for every deployment seeded with it.
 
 ```bash
 npm run seed:demo
 ```
 
 `seed:demo` creates five real-feeling Moshi kitchens with menus, opening hours
-and confirmed registration payments, plus a demo customer. Every seeded account
-uses the password `Demo@2026!`:
+and confirmed registration payments, plus a demo customer. These are fixtures
+for a development database. Every seeded account shares one password, which
+defaults to `Demo@2026!` — a value in this file, so set `SEED_PASSWORD` to
+something else before running it anywhere real:
 
-| Account                 | Email                                             |
-| ----------------------- | ------------------------------------------------- |
-| Admin                   | `admin@chakulafast.test` (password `Admin@2026!`) |
-| Customer                | `customer@chakulafast.test`                       |
-| Mama Ngoma Kitchen      | `mamangoma@chakulafast.test`                      |
-| Kilimanjaro Grill House | `kilimanjarogrill@chakulafast.test`               |
-| Hotel Chagga Bites      | `chaggabites@chakulafast.test`                    |
-| Mbuyuni Fast Food       | `mbuyuni@chakulafast.test`                        |
-| Union Café Moshi        | `unioncafe@chakulafast.test`                      |
+| Account                 | Email                               |
+| ----------------------- | ----------------------------------- |
+| Customer                | `customer@chakulafast.test`         |
+| Mama Ngoma Kitchen      | `mamangoma@chakulafast.test`        |
+| Kilimanjaro Grill House | `kilimanjarogrill@chakulafast.test` |
+| Hotel Chagga Bites      | `chaggabites@chakulafast.test`      |
+| Mbuyuni Fast Food       | `mbuyuni@chakulafast.test`          |
+| Union Café Moshi        | `unioncafe@chakulafast.test`        |
 
 > Turn **off** "Confirm email" under Authentication → Providers → Email while
 > developing, or new signups can't sign in until they click a link.
