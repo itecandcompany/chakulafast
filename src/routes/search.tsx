@@ -206,7 +206,7 @@ function SearchPage() {
 
   return (
     <div className="min-h-[var(--app-100vh)] bg-background pb-24 lg:pb-8 lg:pl-60">
-      <header className="sticky top-0 z-30 border-b bg-background/95 px-4 pb-3 pt-4 backdrop-blur sm:px-6 lg:px-10">
+      <header className="safe-top sticky top-0 z-30 border-b bg-background/95 px-4 pb-3 backdrop-blur sm:px-6 lg:px-10">
         <div className="mx-auto max-w-3xl space-y-3">
           <form onSubmit={submit} className="flex gap-2">
             <div className="relative flex-1">

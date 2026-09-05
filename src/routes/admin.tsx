@@ -39,7 +39,7 @@ function AdminLayout() {
       <div className="flex min-h-screen w-full bg-muted/30">
         <AdminSidebar />
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-10 flex h-14 items-center gap-2 border-b bg-background px-3">
+          <header className="safe-top sticky top-0 z-10 flex min-h-14 items-center gap-2 border-b bg-background px-3 pb-2 [--safe-top-min:0.5rem]">
             <SidebarTrigger />
             <div className="font-display font-semibold">Admin console</div>
             <div className="ml-auto hidden text-xs text-muted-foreground sm:block">

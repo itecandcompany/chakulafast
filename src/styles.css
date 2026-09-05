@@ -54,6 +54,24 @@
      inline styles, which can't be overridden per-breakpoint. */
   --app-tabbar-h: 72px;
 }
+
+/* Pushes a screen's topmost element clear of the status bar, the notch and
+   the Dynamic Island.
+ 
+   `viewport-fit=cover` is what lets the app paint into those areas — without
+   it the page is letterboxed and this would be unnecessary. With it, anything
+   at y=0 renders *underneath* the island, which is why page titles were
+   colliding with the clock and the battery icon on iPhone.
+ 
+   Applied to the header rather than to body so the header's own background
+   fills that strip. Padding on body would leave a bare band above every
+   coloured header instead.
+ 
+   `max()` keeps the design's own spacing on hardware with no inset, where
+   env() resolves to 0 and a bare inset would collapse the padding to nothing. */
+.safe-top {
+  padding-top: max(var(--safe-top-min, 1rem), env(safe-area-inset-top));
+}
 @supports (height: 100svh) {
   :root {
     --app-100vh: 100svh;

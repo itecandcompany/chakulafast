@@ -212,7 +212,9 @@ function RestaurantPage() {
           size="icon"
           onClick={() => navigate({ to: "/search", search: {} })}
           aria-label={t("common.back")}
-          className="absolute left-3 top-3 h-9 w-9 rounded-full shadow-card"
+          // Floats over the cover image, so it needs the inset itself —
+          // there is no header padding above it to inherit.
+          className="absolute left-3 top-[max(0.75rem,env(safe-area-inset-top))] h-9 w-9 rounded-full shadow-card"
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>

@@ -71,7 +71,7 @@ function Landing() {
   return (
     <div className="min-h-[var(--app-100vh)] bg-background pb-24 lg:pb-8 lg:pl-60">
       {/* ---------- Hero ---------- */}
-      <header className="bg-gradient-hero px-4 pb-8 pt-8 text-primary-foreground sm:px-6 lg:px-10">
+      <header className="safe-top bg-gradient-hero px-4 pb-8 text-primary-foreground [--safe-top-min:2rem] sm:px-6 lg:px-10">
         <div className="mx-auto max-w-3xl">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
