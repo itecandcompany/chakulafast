@@ -27,6 +27,29 @@ export function isServerFnFailure(value: unknown): value is ErrorEnvelope {
 }
 
 /**
+ * Throws unless a server function actually succeeded.
+ *
+ * Because a failed call resolves rather than rejects, `await fn()` followed by
+ * a success toast reports success for something that never happened. Every
+ * privileged action in the admin console did exactly that: approving a
+ * restaurant that the server refused still said "is now live", still reloaded
+ * the table, and left the operator to notice on their own that nothing had
+ * changed. That is worse than an error — it actively misleads.
+ *
+ * The discriminator is a numeric `status`. Server functions here that return a
+ * status of their own use strings ("redirect", "already_active"), so a real
+ * result cannot be mistaken for a failure envelope.
+ *
+ * @param action  Phrased to follow "couldn't" — e.g. "approve that listing".
+ */
+export function assertServerFnOk<T>(result: T, action: string): T {
+  if (isServerFnFailure(result)) {
+    throw new Error(describeServerFnFailure(result, action));
+  }
+  return result;
+}
+
+/**
  * @param action  Phrased to follow "couldn't" — e.g. "load your billing details".
  */
 export function describeServerFnFailure(result: unknown, action: string): string {

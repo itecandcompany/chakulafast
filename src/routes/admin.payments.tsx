@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { toUserMessage } from "@/lib/errorMessages";
+import { assertServerFnOk } from "@/lib/serverFnErrors";
 import { fetchAdminPayments, type AdminPaymentRow } from "@/lib/queries/adminTables";
 import { qk } from "@/lib/queryClient";
 import Paginator from "@/components/admin/Paginator";
@@ -67,7 +68,10 @@ function AdminPayments() {
   const confirm = async (payment: Payment) => {
     setBusyId(payment.id);
     try {
-      const result = await adminConfirmPayment({ data: { paymentId: payment.id, note: null } });
+      const result = assertServerFnOk(
+        await adminConfirmPayment({ data: { paymentId: payment.id, note: null } }),
+        "confirm that payment",
+      );
       toast.success(
         result.alreadyConfirmed
           ? "That payment was already confirmed."
@@ -90,7 +94,10 @@ function AdminPayments() {
 
     setBusyId(payment.id);
     try {
-      await adminRejectPayment({ data: { paymentId: payment.id, note } });
+      assertServerFnOk(
+        await adminRejectPayment({ data: { paymentId: payment.id, note } }),
+        "reject that payment",
+      );
       toast.success("Payment rejected");
       await load();
     } catch (err) {

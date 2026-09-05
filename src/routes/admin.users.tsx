@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth";
 import { toUserMessage } from "@/lib/errorMessages";
+import { assertServerFnOk } from "@/lib/serverFnErrors";
 import { adminSetUserRole, adminSetUserSuspended } from "@/lib/adminUsers.functions";
 import { fetchAdminUsers } from "@/lib/queries/adminTables";
 import { qk } from "@/lib/queryClient";
@@ -66,7 +67,10 @@ function AdminUsers() {
   const changeRole = async (profile: Profile, role: AppRole) => {
     setBusyId(profile.id);
     try {
-      await adminSetUserRole({ data: { targetUserId: profile.id, role } });
+      assertServerFnOk(
+        await adminSetUserRole({ data: { targetUserId: profile.id, role } }),
+        "change that role",
+      );
       toast.success(`${profile.full_name} → ${ROLE_LABEL[role]}`);
       await load();
     } catch (err) {
@@ -79,9 +83,12 @@ function AdminUsers() {
   const toggleSuspended = async (profile: Profile) => {
     setBusyId(profile.id);
     try {
-      await adminSetUserSuspended({
-        data: { targetUserId: profile.id, suspended: !profile.is_suspended },
-      });
+      assertServerFnOk(
+        await adminSetUserSuspended({
+          data: { targetUserId: profile.id, suspended: !profile.is_suspended },
+        }),
+        "change that account",
+      );
       toast.success(profile.is_suspended ? "Account restored" : "Account suspended");
       await load();
     } catch (err) {

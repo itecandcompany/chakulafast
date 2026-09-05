@@ -33,6 +33,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toUserMessage } from "@/lib/errorMessages";
+import { assertServerFnOk } from "@/lib/serverFnErrors";
 import { fetchAdminRestaurants } from "@/lib/queries/adminTables";
 import { qk } from "@/lib/queryClient";
 import { useDebounced } from "@/hooks/useDebounced";
@@ -90,9 +91,12 @@ function AdminRestaurants() {
 
     setBusyId(restaurant.id);
     try {
-      await adminSetRestaurantStatus({
-        data: { restaurantId: restaurant.id, status, reason },
-      });
+      assertServerFnOk(
+        await adminSetRestaurantStatus({
+          data: { restaurantId: restaurant.id, status, reason },
+        }),
+        "update that listing",
+      );
       toast.success(`${restaurant.name} → ${RESTAURANT_STATUS_LABEL[status]}`);
       await load();
     } catch (err) {
@@ -130,9 +134,12 @@ function AdminRestaurants() {
 
     setBusyId(restaurant.id);
     try {
-      await adminSetRestaurantStatus({
-        data: { restaurantId: restaurant.id, status: "active", reason: note.trim() || null },
-      });
+      assertServerFnOk(
+        await adminSetRestaurantStatus({
+          data: { restaurantId: restaurant.id, status: "active", reason: note.trim() || null },
+        }),
+        "publish that listing",
+      );
       toast.success(`${restaurant.name} is live — customers can find it now.`);
       await load();
     } catch (err) {
@@ -145,7 +152,10 @@ function AdminRestaurants() {
   const confirmDelete = async () => {
     if (!deleting) return;
     try {
-      await adminDeleteRestaurant({ data: { restaurantId: deleting.id } });
+      assertServerFnOk(
+        await adminDeleteRestaurant({ data: { restaurantId: deleting.id } }),
+        "delete that listing",
+      );
       toast.success(`${deleting.name} deleted`);
       setDeleting(null);
       await load();

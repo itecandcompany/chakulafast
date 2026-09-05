@@ -14,7 +14,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { toUserMessage } from "@/lib/errorMessages";
-import { describeServerFnFailure } from "@/lib/serverFnErrors";
+import { assertServerFnOk, describeServerFnFailure } from "@/lib/serverFnErrors";
 import { formatTsh } from "@/lib/geo";
 import { PAYMENT_METHOD_LABELS } from "@/lib/payments";
 import type { PaymentMethod } from "@/lib/payments";
@@ -119,14 +119,20 @@ function VendorBilling() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const result = await submitRegistrationPayment({
-        data: {
-          restaurantId: restaurant.id,
-          method,
-          reference: reference.trim() || null,
-          msisdn: msisdn.trim() || null,
-        },
-      });
+      // Same trap as the admin actions: a refused submission resolves rather
+      // than rejects, so without this the vendor is told "Payment recorded"
+      // for a payment the server never accepted.
+      const result = assertServerFnOk(
+        await submitRegistrationPayment({
+          data: {
+            restaurantId: restaurant.id,
+            method,
+            reference: reference.trim() || null,
+            msisdn: msisdn.trim() || null,
+          },
+        }),
+        "record your payment",
+      );
 
       if (result.status === "redirect") {
         window.location.href = result.url;
