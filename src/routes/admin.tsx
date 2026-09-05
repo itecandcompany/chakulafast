@@ -2,6 +2,7 @@ import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import AdminSidebar from "@/components/admin/AdminSidebar";
+import UnconfirmedEmailBanner from "@/components/UnconfirmedEmailBanner";
 import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/admin")({
@@ -45,6 +46,8 @@ function AdminLayout() {
               Signed in as {profile.full_name}
             </div>
           </header>
+          <UnconfirmedEmailBanner />
+
           <main className="flex-1 overflow-auto p-4 md:p-6">
             <Outlet />
           </main>

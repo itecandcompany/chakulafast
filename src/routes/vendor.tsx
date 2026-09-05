@@ -4,6 +4,7 @@ import { AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import VendorSidebar from "@/components/vendor/VendorSidebar";
+import UnconfirmedEmailBanner from "@/components/UnconfirmedEmailBanner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { VendorProvider, type Restaurant } from "@/lib/vendorContext";
@@ -121,6 +122,8 @@ function VendorLayout() {
                 {profile.full_name}
               </div>
             </header>
+
+            <UnconfirmedEmailBanner />
 
             {restaurant.status === "pending_payment" && (
               <div className="flex flex-wrap items-start gap-2 border-b bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">

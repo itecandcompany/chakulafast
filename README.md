@@ -110,14 +110,14 @@ used to be written into the script, which published a working set of admin
 credentials for every deployment seeded with it.
 
 ```bash
-npm run seed:demo
+SEED_PASSWORD='SomethingOnlyYouKnow1' npm run seed:demo
 ```
 
 `seed:demo` creates five real-feeling Moshi kitchens with menus, opening hours
-and confirmed registration payments, plus a demo customer. These are fixtures
-for a development database. Every seeded account shares one password, which
-defaults to `Demo@2026!` — a value in this file, so set `SEED_PASSWORD` to
-something else before running it anywhere real:
+and confirmed registration payments, plus a demo customer. These are real Supabase
+Auth accounts that own real listings, so `SEED_PASSWORD` is required and has no
+default — a password written in the repo would be a published credential the
+moment anyone ran this against a live project:
 
 | Account                 | Email                               |
 | ----------------------- | ----------------------------------- |

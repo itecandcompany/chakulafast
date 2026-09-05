@@ -9,8 +9,11 @@
 // Idempotent: re-running updates the existing rows instead of duplicating.
 //
 // Usage:
-//   npm run seed:demo
-//   node --env-file=.env scripts/seed-demo.mjs
+//   SEED_PASSWORD='SomethingOnlyYouKnow1' npm run seed:demo
+//
+// SEED_PASSWORD is required and has no default. These are real Supabase Auth
+// accounts owning real listings, so a password written in this file would be a
+// published credential for anyone who ran the script against a live project.
 
 import { createClient } from "@supabase/supabase-js";
 
@@ -22,7 +25,33 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   process.exit(1);
 }
 
-const PASSWORD = process.env.SEED_PASSWORD || "Demo@2026!";
+// No default, deliberately.
+//
+// This used to fall back to a literal written in this file, which meant every
+// seeded account — five restaurant owners who can edit live menus and prices —
+// shared a password that anyone reading the repository already knew. Harmless
+// on a throwaway local database and a real hole the moment someone runs this
+// against the project their customers use, which is one mistyped command away.
+const PASSWORD = process.env.SEED_PASSWORD;
+
+if (!PASSWORD) {
+  console.error(
+    [
+      "Set SEED_PASSWORD before seeding demo data.",
+      "",
+      "  SEED_PASSWORD='SomethingOnlyYouKnow1' npm run seed:demo",
+      "",
+      "Every seeded account shares this password, and they are real accounts",
+      "that own real listings — so it must not be a value written in the repo.",
+    ].join("\n"),
+  );
+  process.exit(1);
+}
+
+if (PASSWORD.length < 8 || !/[A-Za-z]/.test(PASSWORD) || !/[0-9]/.test(PASSWORD)) {
+  console.error("SEED_PASSWORD must be at least 8 characters and contain a letter and a digit.");
+  process.exit(1);
+}
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
@@ -338,7 +367,7 @@ async function main() {
       ``,
       `Done — ${RESTAURANTS.length} restaurants in Moshi, ${totalDishes} dishes.`,
       ``,
-      `Every seeded account uses the password: ${PASSWORD}`,
+      `Every seeded account uses the SEED_PASSWORD you just supplied.`,
       ``,
       `Try it:`,
       `  1. Open the app and search "ugali" — five kitchens, 2,500 to 9,500 TSh.`,
