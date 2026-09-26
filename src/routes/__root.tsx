@@ -12,9 +12,33 @@ import SetupRequired from "@/components/SetupRequired";
 import { isSupabaseConfigured } from "@/integrations/supabase/client";
 import { createQueryClient } from "@/lib/queryClient";
 
-const TITLE = "ChakulaFast — Order food ahead, ready when you arrive";
+const TITLE = "ChakulaFast (Chakula Fast) — Pre-order food in Tanzania | by Genesis, ITEC";
 const DESCRIPTION =
-  "Search for the dish you want, compare prices at restaurants and hotels near you in Tanzania, and pre-order so your food is ready the moment you walk in.";
+  "ChakulaFast (Chakula Fast) is a Tanzania food pre-ordering app. Search for the dish you want, compare prices at restaurants and hotels near you, and pre-order so your food is ready the moment you walk in. Built by Genesis at ITEC.";
+const SITE_URL = "https://chakulafast.vercel.app";
+
+const STRUCTURED_DATA = {
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  name: "ChakulaFast",
+  alternateName: "Chakula Fast",
+  url: SITE_URL,
+  applicationCategory: "FoodApplication",
+  operatingSystem: "Web, Android, iOS",
+  description: DESCRIPTION,
+  creator: {
+    "@type": "Organization",
+    name: "Genesis",
+    parentOrganization: {
+      "@type": "Organization",
+      name: "ITEC",
+    },
+  },
+  areaServed: {
+    "@type": "Country",
+    name: "Tanzania",
+  },
+};
 
 function NotFoundComponent() {
   return (
@@ -117,6 +141,13 @@ export const Route = createRootRoute({
       {
         rel: "stylesheet",
         href: "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap",
+      },
+      { rel: "canonical", href: SITE_URL },
+    ],
+    scripts: [
+      {
+        type: "application/ld+json",
+        children: JSON.stringify(STRUCTURED_DATA),
       },
     ],
   }),
